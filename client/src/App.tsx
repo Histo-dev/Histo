@@ -10,8 +10,10 @@ function App() {
       gap:24,
       background:'#111'
     }}>
-      <div style={{display:'flex',flexDirection:'column',gap:20}}>
-        
+      <div className="extension-root">
+        <div className="extension-panel" style={{ padding: 20 }}>
+          <h2>Preview</h2>
+        </div>
       </div>
     </div>
   )

@@ -19,7 +19,11 @@ function IconPlay() {
   )
 }
 
-export default function HeroIntro() {
+type Props = {
+  onStart?: () => void
+}
+
+export default function HeroIntro({ onStart }: Props) {
   return (
     <section className={styles.hero} role="region" aria-label="온보딩">
       <div className={styles.iconWrap} aria-hidden>
@@ -35,7 +39,13 @@ export default function HeroIntro() {
         <br />카테고리별 사용 시간을 확인하세요
       </p>
 
-      <button className={styles.cta} aria-label="분석 시작">
+      <button
+        className={styles.cta}
+        aria-label="분석 시작"
+        onClick={() => {
+          if (onStart) onStart()
+        }}
+      >
         <span className={styles.ctaIcon} aria-hidden>
           <IconPlay />
         </span>

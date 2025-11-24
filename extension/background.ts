@@ -32,3 +32,13 @@ chrome.tabs?.onUpdated?.addListener((tabId: number, changeInfo: any, tab: any) =
 chrome.runtime.onInstalled?.addListener(() => {
   console.log('Histo background installed')
 })
+
+chrome.runtime?.onMessage?.addListener((msg: any, sender: any, sendResponse: any) => {
+  if (msg?.action === 'start-analysis') {
+    console.log('Received start-analysis from', sender)
+    // mark analysis state in storage
+    chrome.storage.local.set({ analysisState: 'running', analysisStartedAt: Date.now() })
+    // Example: could trigger immediate small aggregation here
+    sendResponse({ ok: true })
+  }
+})

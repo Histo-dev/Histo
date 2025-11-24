@@ -30,6 +30,25 @@ body {
   min-height: 100vh;
 }
 
+/* Extension root container: fixed width matching HeroIntro */
+.extension-root {
+  width: 320px;
+  height: auto; /* let popup size to content so HeroIntro won't scroll */
+  overflow: hidden; /* clip rounded corners */
+  margin: 0; /* handled by popup sizing */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  border-radius: 16px; /* rounded popup corners */
+  box-shadow: 0 8px 30px rgba(33, 37, 57, 0.12);
+}
+.extension-panel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0; /* individual components control internal padding */
+  overflow: visible; /* allow content to size the popup without inner scrolling */
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;

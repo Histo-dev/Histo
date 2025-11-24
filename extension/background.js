@@ -1,5 +1,5 @@
 (() => {
-  // ../extension/background.ts
+  // extension/background.ts
   function saveVisit(record) {
     chrome.storage.local.get({ visits: [] }, (res) => {
       const visits = res.visits || [];
@@ -23,5 +23,12 @@
   });
   chrome.runtime.onInstalled?.addListener(() => {
     console.log("Histo background installed");
+  });
+  chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
+    if (msg?.action === "start-analysis") {
+      console.log("Received start-analysis from", sender);
+      chrome.storage.local.set({ analysisState: "running", analysisStartedAt: Date.now() });
+      sendResponse({ ok: true });
+    }
   });
 })();
