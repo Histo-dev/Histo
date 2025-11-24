@@ -1,49 +1,52 @@
 import { createRoot } from 'react-dom/client'
 import { useState } from 'react'
-
+import { MemoryRouter, Routes, Route, useNavigate} from 'react-router-dom'
 declare const chrome: any
 import './index.css'
-import Loading from './components/Hero/Loading'
-import HeroIntro from './components/Hero/HeroIntro'
-import Design1070 from './components/Hero/Design1070'
+import HistoIntro from './components/Home/HistoIntro'
+import Loading from './components/Home/Loading'
+import Analysis from './components/Analysis/Analysis'
 
-function PopupApp() {
-  const [screen, setScreen] = useState<'intro' | 'loading' | 'design'>('intro')
+const MIN_LOADING_MS = 1000  // 최소 로딩 유지 시간
+
+function PopUpRoutes() {
+  const navigate = useNavigate()
+  const [isLoading, setIsLoading] = useState(false)
 
   const startAnalysis = () => {
-    setScreen('loading')
-    try {
-      // notify background to start analysis
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({ action: 'start-analysis' }, (resp: any) => {
-          // background acknowledged — we keep loading until analysis finishes
-          console.log('background ack', resp)
-        })
-      }
-    } catch (e) {
-      console.error('sendMessage failed', e)
-    }
+    setIsLoading(true)  // 로딩 시작
+    const start = Date.now()
+    
+    chrome.runtime.sendMessage({ action: 'start-analysis' }, () => {
+      const elapsed = Date.now() - start
+      const remaining = Math.max(0, MIN_LOADING_MS - elapsed)
+      setTimeout(() => {
+        setIsLoading(false)  // 로딩 끝
+        navigate('/analysis/overview')  // 결과로 이동
+      }, remaining)
+    })
   }
 
+  if (isLoading) return <Loading />
+
+  return (
+    <Routes>
+      <Route path="/" element={<HistoIntro onStart={startAnalysis}/>} />
+      <Route path="/analysis/*" element={<Analysis onBack={() => navigate('/')}/>} />
+    </Routes>
+  )
+}
+
+function PopUpApp() {
   return (
     <div className="extension-root">
       <div className="extension-panel">
-        <div style={{ padding: '8px 12px', display: 'flex', gap: 8 }}>
-          <button onClick={() => { setScreen('intro'); }} style={{ padding: '6px 8px', fontSize: 12 }}>Intro</button>
-          <button onClick={() => { setScreen('loading'); }} style={{ padding: '6px 8px', fontSize: 12 }}>Loading</button>
-          <button onClick={() => { setScreen('design'); }} style={{ padding: '6px 8px', fontSize: 12 }}>Design</button>
-        </div>
-
-        {screen === 'loading' ? (
-          <Loading />
-        ) : screen === 'design' ? (
-          <Design1070 onBack={() => setScreen('intro')} />
-        ) : (
-          <HeroIntro onStart={startAnalysis} />
-        )}
+        <MemoryRouter>
+          <PopUpRoutes />
+        </MemoryRouter>
       </div>
     </div>
   )
 }
 
-createRoot(document.getElementById('root')!).render(<PopupApp />)
+createRoot(document.getElementById('root')!).render(<PopUpApp />)
