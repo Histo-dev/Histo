@@ -1,0 +1,17 @@
+.card {
+  width:320px;
+  background:#fff;
+  border-radius:10px;
+  padding:18px;
+  box-sizing:border-box;
+  box-shadow: 0 1px 0 rgba(16,24,40,0.04);
+}
+.header h4 { margin:0; font-size:16px }
+.sub { color:#6a7282; font-size:13px; margin:4px 0 12px }
+.stats { display:flex; gap:12px; margin-bottom:12px }
+.statItem { background:#f8fafc; padding:10px; border-radius:8px; flex:1; text-align:center }
+.statLabel { color:#6a7282; font-size:12px }
+.statValue { font-weight:600; margin-top:6px }
+.chartPlaceholder { height:140px; border-radius:8px; background:linear-gradient(90deg,#f8fafc,#fff); margin:8px 0 }
+.topList { list-style:none; padding:0; margin:10px 0 0 }
+.topList li { padding:10px 0; border-top:1px solid #f1f5f9; font-size:14px }
