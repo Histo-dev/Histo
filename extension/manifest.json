@@ -10,7 +10,10 @@
   },
   "action": {
     "default_popup": "dist/popup.html",
-    "default_title": "Histo"
+    "default_title": "Histo",
+    "default_icon": {
+      "16": "icons/HistoLogo.png"
+    }
   },
   "options_page": "dist/options.html",
   "web_accessible_resources": [{
