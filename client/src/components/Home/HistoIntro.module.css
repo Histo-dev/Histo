@@ -1,0 +1,56 @@
+.hero {
+  width: 100%;
+  padding: var(--panel-padding);
+  border-radius: var(--radius);
+  box-sizing: border-box;
+  text-align: center;
+  background: linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%);
+  color: var(--text);
+  font-family: 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+.iconWrap { display:flex; justify-content:center }
+.iconCircle {
+  width: 88px;
+  height: 88px;
+  border-radius: 9999px;
+  background: rgba(79,57,246,0.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin: 8px auto 16px;
+}
+.title {
+  color: #312c85;
+  font-size: 18px;
+  margin: 6px 0 6px;
+  font-weight: 700;
+}
+.subtitle {
+  color: var(--muted-2);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+.cta {
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  background: linear-gradient(90deg,var(--accent),var(--primary));
+  color:#fff;
+  border: none;
+  padding:10px 20px;
+  border-radius: 10px;
+  cursor:pointer;
+  font-size: 14px;
+  box-shadow: var(--shadow);
+}
+.ctaIcon { display:inline-flex; width:18px; height:18px }
+.features {
+  list-style:none;
+  padding:0;
+  margin:14px 0 0;
+  color: var(--muted-2);
+  font-size:13px;
+}
+.features li { padding:8px 0; display:flex; align-items:center; justify-content:flex-start; gap:8px }
+.featureIcon { width:18px; display:inline-block }

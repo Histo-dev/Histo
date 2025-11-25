@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Histo - Browser History Analyzer",
+  "version": "0.1.0",
+  "description": "Analyze and provide feedback on browser history (prototype)",
+  "permissions": ["history", "storage", "notifications", "tabs", "alarms"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "dist/popup.html",
+    "default_title": "Histo",
+    "default_icon": {
+      "16": "icons/HistoLogo.png"
+    }
+  },
+  "options_page": "dist/options.html",
+  "web_accessible_resources": [{
+    "resources": ["icons/*"],
+    "matches": ["<all_urls>"]
+  }]
+}

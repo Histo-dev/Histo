@@ -1,0 +1,15 @@
+.header {
+  display:flex;
+  flex-direction:row;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:10px;
+}
+.title { font-size:16px; font-weight:600; color:#312c85; line-height: 24px; }
+.subtitle { font-size:16px; font-weight:400; color: #6A7282; line-height: 24px; }
+.close {
+  background:transparent;
+  border:none;
+  color:#6b6b8a;
+  cursor:pointer;
+}
