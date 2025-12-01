@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "build:client": "pnpm --prefix client build",
-    "build:background": "npx esbuild extension/background.ts --bundle --platform=browser --outfile=extension/background.js",
+    "build:background": "node scripts/build-background.js",
     "build:extension": "pnpm run build:client && rm -rf extension/dist && cp -r client/dist extension/dist && pnpm run build:background",
     "build:extension:window": "pnpm run build:client && rmdir /s /q extension\\dist 2>nul & xcopy /e /i /y client\\dist extension\\dist && pnpm run build:background"
   },
