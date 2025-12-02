@@ -15,17 +15,15 @@ const palette = [
 
 export default function Overview() {
   const state = useUsageStore();
-  const { categoryStats, totalTimeMinutes, loading } = {
-    categoryStats: state.categoryStats,
-    totalTimeMinutes: state.totalTimeMinutes,
-    loading: state.loading,
-  };
+  const { categoryStats, totalTimeMinutes, loading } = state;
 
   const categoriesWithColor = useMemo(() => {
-    return categoryStats.map((c, idx) => ({
-      ...c,
-      color: palette[idx % palette.length],
-    }));
+    return [...categoryStats]
+      .sort((a, b) => b.minutes - a.minutes)
+      .map((c, idx) => ({
+        ...c,
+        color: palette[idx % palette.length],
+      }));
   }, [categoryStats]);
 
   const formatMinutes = (mins: number) => {

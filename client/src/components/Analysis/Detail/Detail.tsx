@@ -5,11 +5,7 @@ import Domain, { type ISite } from "./Domain";
 
 export default function Detail() {
   const state = useUsageStore();
-  const { siteStats, totalTimeMinutes, loading } = {
-    siteStats: state.siteStats,
-    totalTimeMinutes: state.totalTimeMinutes,
-    loading: state.loading,
-  };
+  const { siteStats, totalTimeMinutes, loading } = state;
 
   const formatTime = (mins: number) => {
     if (mins >= 60) {
@@ -25,7 +21,13 @@ export default function Detail() {
     chrome.tabs.create({ url: `https://${domain}` });
   };
 
-  const sites = useMemo(() => siteStats.slice(0, 10), [siteStats]);
+  const sites = useMemo(
+    () =>
+      [...siteStats]
+        .sort((a, b) => b.minutes - a.minutes)
+        .slice(0, 10),
+    [siteStats]
+  );
 
   if (loading)
     return <div className={styles.contentCenter}>불러오는 중...</div>;

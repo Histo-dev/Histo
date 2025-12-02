@@ -12,6 +12,7 @@ const MIN_LOADING_MS = 1000;
 function PopUpRoutes() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const startAnalysis = () => {
     setIsLoading(true);
@@ -21,6 +22,8 @@ function PopUpRoutes() {
       const elapsed = Date.now() - start;
       const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
       setTimeout(() => {
+        // Force refresh of data by changing key
+        setRefreshKey((prev) => prev + 1);
         setIsLoading(false);
         navigate("/analysis/overview");
       }, remaining);
@@ -34,7 +37,7 @@ function PopUpRoutes() {
       <Route path="/" element={<HistoIntro onStart={startAnalysis} />} />
       <Route
         path="/analysis/*"
-        element={<Analysis onBack={() => navigate("/")} />}
+        element={<Analysis onBack={() => navigate("/")} key={refreshKey} />}
       />
     </Routes>
   );

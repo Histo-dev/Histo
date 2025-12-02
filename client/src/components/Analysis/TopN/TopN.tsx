@@ -5,13 +5,12 @@ import useUsageStore from "../../../store/usageStore";
 
 export default function TopN() {
   const state = useUsageStore();
-  const { siteStats, totalTimeMinutes, loading } = {
-    siteStats: state.siteStats,
-    totalTimeMinutes: state.totalTimeMinutes,
-    loading: state.loading,
-  };
+  const { siteStats, totalTimeMinutes, loading } = state;
 
-  const topSites = useMemo(() => siteStats.slice(0, 3), [siteStats]);
+  const topSites = useMemo(() => {
+    // Sort by minutes descending and take top 3
+    return [...siteStats].sort((a, b) => b.minutes - a.minutes).slice(0, 3);
+  }, [siteStats]);
 
   const formatTime = (mins: number) => {
     if (mins >= 60) {

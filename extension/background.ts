@@ -101,6 +101,15 @@ const aggregateAndStore = async () => {
     categoryMap?: Record<string, string>
   }>(['sessions', 'visits', 'categoryMap'])
 
+  // Close current session if still open
+  if (currentSession) {
+    const end = Date.now()
+    const durationMs = Math.max(0, end - currentSession.start)
+    const session: Session = { ...currentSession, end, durationMs }
+    sessions.push(session)
+    currentSession = null
+  }
+
   if (!Array.isArray(sessions) || sessions.length === 0) {
     await storageSet({
       siteStats: {},
@@ -143,9 +152,12 @@ const aggregateAndStore = async () => {
     categoryStats[cat].visits += 1
   })
 
+  // Round totalMinutes first to use accurate total for percentage calculation
+  const roundedTotalMinutes = Math.round(totalMinutes)
+  
   Object.values(siteStats).forEach((s) => {
     s.minutes = Math.round(s.minutes)
-    s.pctOfDay = totalMinutes ? Math.round((s.minutes / totalMinutes) * 1000) / 10 : 0
+    s.pctOfDay = roundedTotalMinutes ? Math.round((s.minutes / roundedTotalMinutes) * 1000) / 10 : 0
   })
   Object.values(categoryStats).forEach((c) => {
     c.minutes = Math.round(c.minutes)
@@ -154,7 +166,7 @@ const aggregateAndStore = async () => {
 
   const dailyTotals: DailyTotal = {
     date: DAY_KEY(),
-    totalMinutes: Math.round(totalMinutes),
+    totalMinutes: roundedTotalMinutes,
     totalSites: Object.keys(siteStats).length,
     totalVisits: visits.length,
   }
