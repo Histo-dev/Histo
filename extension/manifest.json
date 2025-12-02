@@ -15,9 +15,14 @@
       "16": "icons/HistoLogo.png"
     }
   },
-  "options_page": "dist/options.html",
-  "web_accessible_resources": [{
-    "resources": ["icons/*"],
-    "matches": ["<all_urls>"]
-  }]
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/*", "icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

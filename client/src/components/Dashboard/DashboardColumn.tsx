@@ -1,9 +1,8 @@
 import styles from "./DashboardColumn.module.css";
-import useUsageStore from "../../store/usageStore";
+import useUsageStore from "../../store/UsageContext";
 
 export default function DashboardColumn() {
-  const state = useUsageStore();
-  const { totalTimeMinutes, totalSites, siteStats, loading } = state;
+  const { totalTimeMinutes, totalSites, siteStats, loading } = useUsageStore();
 
   const formatTime = (mins: number) => {
     if (mins >= 60) {
