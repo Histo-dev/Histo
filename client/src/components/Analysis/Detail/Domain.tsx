@@ -1,43 +1,47 @@
-import styles from './Domain.module.css'
+import styles from "./Domain.module.css";
 
 interface Props {
-  site: ISite
-  formatedTime: string
-  percentage: string
-  onOpen?: (domain: string) => void
+  site: ISite;
+  formatedTime: string;
+  percentage: string;
+  onOpen?: (domain: string) => void;
 }
 
 interface ISite {
-  domain: string
-  category?: string
-  minutes: number
-  pct?: number
+  domain: string;
+  category?: string;
+  minutes: number;
+  pct?: number;
 }
 
 const Domain = ({ site, formatedTime, percentage, onOpen }: Props) => {
   // Generate favicon URL from domain
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(site.domain)}&sz=32`;
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+    site.domain
+  )}&sz=32`;
 
   return (
     <div key={site.domain} className={styles.row}>
-      <img 
-        src={faviconUrl} 
+      <img
+        src={faviconUrl}
         alt={site.domain}
         className={styles.favicon}
         title={site.domain}
         onError={(e) => {
           // Fallback to text if favicon fails
-          e.currentTarget.style.display = 'none';
+          e.currentTarget.style.display = "none";
         }}
       />
-      <span className={styles.legendName}>{site.category ?? '기타'}</span>
+      <span className={styles.legendName}>{site.category ?? "기타"}</span>
       <div className={styles.time}>{formatedTime}</div>
       <div className={styles.pct}>{percentage}%</div>
-      <button className={styles.open} onClick={() => onOpen?.(site.domain)}>열기</button>
+      <button className={styles.open} onClick={() => onOpen?.(site.domain)}>
+        열기
+      </button>
     </div>
-  )
-}
+  );
+};
 
-export default Domain
+export default Domain;
 
-export type { ISite }
+export type { ISite };

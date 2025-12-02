@@ -22,10 +22,7 @@ export default function Detail() {
   };
 
   const sites = useMemo(
-    () =>
-      [...siteStats]
-        .sort((a, b) => b.minutes - a.minutes)
-        .slice(0, 10),
+    () => [...siteStats].sort((a, b) => b.minutes - a.minutes).slice(0, 10),
     [siteStats]
   );
 
