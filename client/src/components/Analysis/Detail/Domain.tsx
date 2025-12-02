@@ -22,10 +22,53 @@ const Domain = ({
   onOpen,
   showDomain = false,
 }: Props) => {
-  // Generate favicon URL from domain
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-    site.domain
-  )}&sz=32`;
+  // Get accurate favicon based on domain/service
+  const getAccurateFaviconUrl = (domain: string): string => {
+    const lowercaseDomain = domain.toLowerCase();
+
+    // Special cases for better icons
+    if (
+      lowercaseDomain.includes("docs.google.com") ||
+      lowercaseDomain === "docs.google.com"
+    ) {
+      return "https://www.gstatic.com/images/branding/product/1x/docs_2020q4_48dp.png";
+    }
+    if (
+      lowercaseDomain.includes("drive.google.com") ||
+      lowercaseDomain === "drive.google.com"
+    ) {
+      return "https://www.gstatic.com/images/branding/product/1x/drive_2020q4_48dp.png";
+    }
+    if (
+      lowercaseDomain.includes("sheets.google.com") ||
+      lowercaseDomain === "sheets.google.com"
+    ) {
+      return "https://www.gstatic.com/images/branding/product/1x/sheets_2020q4_48dp.png";
+    }
+    if (
+      lowercaseDomain.includes("slides.google.com") ||
+      lowercaseDomain === "slides.google.com"
+    ) {
+      return "https://www.gstatic.com/images/branding/product/1x/slides_2020q4_48dp.png";
+    }
+    if (
+      lowercaseDomain.includes("gmail.com") ||
+      lowercaseDomain === "gmail.com"
+    ) {
+      return "https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_48dp.png";
+    }
+    if (
+      lowercaseDomain.includes("calendar.google.com") ||
+      lowercaseDomain === "calendar.google.com"
+    ) {
+      return "https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png";
+    }
+
+    // Fallback to DuckDuckGo Icon API (better than Google's)
+    return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
+  };
+
+  const faviconUrl = getAccurateFaviconUrl(site.domain);
 
   return (
     <div key={site.domain} className={styles.row}>
@@ -35,8 +78,15 @@ const Domain = ({
         className={styles.favicon}
         title={site.domain}
         onError={(e) => {
-          // Fallback to text if favicon fails
-          e.currentTarget.style.display = "none";
+          // Fallback to Google favicon if DuckDuckGo fails
+          if (!e.currentTarget.src.includes("google.com/s2/favicons")) {
+            e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+              site.domain
+            )}&sz=32`;
+          } else {
+            // Hide if all fail
+            e.currentTarget.style.display = "none";
+          }
         }}
       />
       <span className={styles.legendName}>
