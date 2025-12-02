@@ -168,7 +168,17 @@ const categorize = (
     t.includes("x.com")
   )
     return "소셜";
-  if (t.includes("docs") || t.includes("notion") || t.includes("github"))
+  if (
+    t.includes("docs") ||
+    t.includes("notion") ||
+    t.includes("github") ||
+    t.includes("gitlab") ||
+    t.includes("bitbucket") ||
+    t.includes("stackoverflow") ||
+    t.includes("jira") ||
+    t.includes("slack") ||
+    t.includes("vscode")
+  )
     return "업무";
   if (t.includes("news")) return "뉴스";
   if (t.includes("shopping") || t.includes("shop") || t.includes("store"))

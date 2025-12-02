@@ -51,7 +51,13 @@ export default function Detail() {
       <div className={styles.actions}>
         <button
           className={styles.primary}
-          onClick={() => chrome?.runtime?.openOptionsPage?.()}
+          onClick={() => {
+            if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+              chrome.tabs.create({
+                url: chrome.runtime.getURL("options.html"),
+              });
+            }
+          }}
         >
           설정으로 이동
         </button>

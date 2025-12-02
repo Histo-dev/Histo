@@ -63,6 +63,12 @@ const Domain = ({
     ) {
       return "https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png";
     }
+    if (
+      lowercaseDomain.includes("github.com") ||
+      lowercaseDomain === "github.com"
+    ) {
+      return "https://github.githubassets.com/favicons/favicon.ico";
+    }
 
     // Fallback to DuckDuckGo Icon API (better than Google's)
     return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
