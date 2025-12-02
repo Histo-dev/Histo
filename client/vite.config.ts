@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -8,11 +8,11 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        main: 'index.html',
-        popup: 'popup.html',
-        options: 'options.html',
+        main: "index.html",
+        popup: "popup.html",
+        options: "options.html",
       },
     },
   },
-  base: './',
+  base: "./",
 });

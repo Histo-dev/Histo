@@ -1,35 +1,36 @@
-import { useMemo } from 'react'
-import styles from './Detail.module.css'
-import useUsageStore, { type UsageState } from '../../../store/usageStore'
-import Domain, { type ISite } from './Domain'
-
-declare const chrome: any
+import { useMemo } from "react";
+import styles from "./Detail.module.css";
+import useUsageStore from "../../../store/usageStore";
+import Domain, { type ISite } from "./Domain";
 
 export default function Detail() {
-  const { siteStats, totalTimeMinutes, loading } = useUsageStore((s: UsageState) => ({
-    siteStats: s.siteStats,
-    totalTimeMinutes: s.totalTimeMinutes,
-    loading: s.loading,
-  }))
+  const state = useUsageStore();
+  const { siteStats, totalTimeMinutes, loading } = {
+    siteStats: state.siteStats,
+    totalTimeMinutes: state.totalTimeMinutes,
+    loading: state.loading,
+  };
 
   const formatTime = (mins: number) => {
     if (mins >= 60) {
-      const h = Math.floor(mins / 60)
-      const m = mins % 60
-      return m === 0 ? `${h}시간` : `${h}시간 ${m}분`
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
-    return `${Math.max(0, Math.round(mins))}분`
-  }
+    return `${Math.max(0, Math.round(mins))}분`;
+  };
 
   const openDomain = (domain: string) => {
-    if (typeof chrome === 'undefined' || !chrome.tabs?.create) return
-    chrome.tabs.create({ url: `https://${domain}` })
-  }
+    if (typeof chrome === "undefined" || !chrome.tabs?.create) return;
+    chrome.tabs.create({ url: `https://${domain}` });
+  };
 
-  const sites = useMemo(() => siteStats.slice(0, 10), [siteStats])
+  const sites = useMemo(() => siteStats.slice(0, 10), [siteStats]);
 
-  if (loading) return <div className={styles.contentCenter}>불러오는 중...</div>
-  if (sites.length === 0) return <div className={styles.contentCenter}>아직 기록이 없습니다.</div>
+  if (loading)
+    return <div className={styles.contentCenter}>불러오는 중...</div>;
+  if (sites.length === 0)
+    return <div className={styles.contentCenter}>아직 기록이 없습니다.</div>;
 
   return (
     <>
@@ -39,15 +40,23 @@ export default function Detail() {
             key={s.domain}
             site={s as ISite}
             formatedTime={formatTime(s.minutes)}
-            percentage={((s.minutes / (totalTimeMinutes || s.minutes || 1)) * 100).toFixed(1)}
+            percentage={(
+              (s.minutes / (totalTimeMinutes || s.minutes || 1)) *
+              100
+            ).toFixed(1)}
             onOpen={openDomain}
           />
         ))}
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.primary} onClick={() => chrome?.runtime?.openOptionsPage?.()}>설정으로 이동</button>
+        <button
+          className={styles.primary}
+          onClick={() => chrome?.runtime?.openOptionsPage?.()}
+        >
+          설정으로 이동
+        </button>
       </div>
     </>
-  )
+  );
 }
