@@ -7,9 +7,14 @@ export default function TopN() {
   const state = useUsageStore();
   const { siteStats, totalTimeMinutes, loading } = state;
 
-  const topSites = useMemo(() => {
-    // Sort by minutes descending and take top 3
+  // Sort by minutes (time spent)
+  const topByTime = useMemo(() => {
     return [...siteStats].sort((a, b) => b.minutes - a.minutes).slice(0, 3);
+  }, [siteStats]);
+
+  // Sort by visits (visit count)
+  const topByVisits = useMemo(() => {
+    return [...siteStats].sort((a, b) => b.visits - a.visits).slice(0, 3);
   }, [siteStats]);
 
   const formatTime = (mins: number) => {
@@ -26,7 +31,7 @@ export default function TopN() {
     chrome.tabs.create({ url: `https://${domain}` });
   };
 
-  const iconPath =
+  const trophyIcon =
     typeof chrome !== "undefined" && chrome.runtime?.getURL
       ? chrome.runtime.getURL("icons/trophy.svg")
       : "";
@@ -34,32 +39,68 @@ export default function TopN() {
   if (loading)
     return <div className={styles.contentCenter}>불러오는 중...</div>;
 
-  if (topSites.length === 0) {
+  const hasData = topByTime.length > 0 || topByVisits.length > 0;
+
+  if (!hasData) {
     return (
       <div className={styles.contentCenter}>아직 분석된 사이트가 없습니다.</div>
     );
   }
 
   return (
-    <>
-      <div className={styles.title}>
-        {iconPath && <img src={iconPath} />}
-        <h3>가장 많이 방문한 사이트</h3>
-      </div>
-      <div className={styles.list}>
-        {topSites.map((t) => (
-          <Domain
-            key={t.domain}
-            site={t as ISite}
-            formatedTime={formatTime(t.minutes)}
-            percentage={(
-              (t.minutes / (totalTimeMinutes || t.minutes || 1)) *
-              100
-            ).toFixed(1)}
-            onOpen={openDomain}
-          />
-        ))}
-      </div>
-    </>
+    <div className={styles.container}>
+      {/* Most Time Spent */}
+      {topByTime.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.title}>
+            {trophyIcon && <img src={trophyIcon} alt="trophy" />}
+            <h3>가장 오래 체류한 사이트</h3>
+          </div>
+          <div className={styles.list}>
+            {topByTime.map((t, idx) => (
+              <div key={t.domain} className={styles.rankItem}>
+                <div className={styles.rank}>{idx + 1}</div>
+                <Domain
+                  site={t as ISite}
+                  formatedTime={formatTime(t.minutes)}
+                  percentage={(
+                    (t.minutes / (totalTimeMinutes || t.minutes || 1)) *
+                    100
+                  ).toFixed(1)}
+                  onOpen={openDomain}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Most Visited */}
+      {topByVisits.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.title}>
+            {trophyIcon && <img src={trophyIcon} alt="trophy" />}
+            <h3>가장 많이 방문한 사이트</h3>
+          </div>
+          <div className={styles.list}>
+            {topByVisits.map((t, idx) => (
+              <div key={t.domain} className={styles.rankItem}>
+                <div className={styles.rank}>{idx + 1}</div>
+                <Domain
+                  site={t as ISite}
+                  formatedTime={`${t.visits}회`}
+                  percentage={(
+                    (t.visits /
+                      (siteStats.reduce((sum, s) => sum + s.visits, 0) || 1)) *
+                    100
+                  ).toFixed(1)}
+                  onOpen={openDomain}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
