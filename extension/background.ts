@@ -47,6 +47,10 @@ type DailyTotal = {
   totalVisits: number;
 };
 
+type HistoryRecord = {
+  [date: string]: DailyTotal;
+};
+
 const MAX_VISITS = 1000;
 const MAX_SESSIONS = 500;
 const DAY_KEY = () => new Date().toISOString().slice(0, 10);
@@ -91,6 +95,63 @@ const appendSession = async (session: Session) => {
   await storageSet({ sessions });
 };
 
+// Save daily totals to history archive
+const archiveDailyData = async (dailyTotal: DailyTotal) => {
+  const data = await storageGet<{ dailyHistory?: HistoryRecord }>({
+    dailyHistory: {},
+  });
+  const dailyHistory = (data.dailyHistory ?? {}) as HistoryRecord;
+  dailyHistory[dailyTotal.date] = dailyTotal;
+  await storageSet({ dailyHistory });
+  console.log("[histo] archived daily data:", dailyTotal);
+};
+
+// Check if date changed and reset if needed
+const checkAndResetIfNewDay = async () => {
+  const data = await storageGet<{ lastDate?: string }>();
+  const currentDate = DAY_KEY();
+  const lastDate = data.lastDate;
+
+  if (lastDate && lastDate !== currentDate) {
+    // Date changed, archive previous day's data and reset
+    const {
+      siteStats = {},
+      categoryStats = {},
+      dailyTotals = null,
+    } = await storageGet<{
+      siteStats?: Record<string, SiteStat>;
+      categoryStats?: Record<string, CategoryStat>;
+      dailyTotals?: DailyTotal;
+    }>(["siteStats", "categoryStats", "dailyTotals"]);
+
+    // Archive previous day if it has data
+    if (dailyTotals && dailyTotals.totalMinutes > 0) {
+      await archiveDailyData(dailyTotals);
+    }
+
+    // Reset current data
+    await storageSet({
+      sessions: [],
+      visits: [],
+      siteStats: {},
+      categoryStats: {},
+      dailyTotals: {
+        date: currentDate,
+        totalMinutes: 0,
+        totalSites: 0,
+        totalVisits: 0,
+      },
+      lastDate: currentDate,
+    });
+    console.log("[histo] new day detected, data reset");
+  }
+
+  // Update lastDate if not set
+  if (!lastDate) {
+    await storageSet({ lastDate: currentDate });
+  }
+};
+
 const categorize = (
   domain: string,
   title?: string,
@@ -116,6 +177,9 @@ const categorize = (
 };
 
 const aggregateAndStore = async () => {
+  // Check if date changed and reset if needed
+  await checkAndResetIfNewDay();
+
   const {
     sessions = [],
     visits = [],
@@ -307,19 +371,58 @@ chrome.idle?.onStateChanged?.addListener((newState) => {
 
 chrome.runtime.onInstalled?.addListener(() => {
   console.log("Histo background installed");
-  storageSet({ analysisState: "idle" });
+  const currentDate = DAY_KEY();
+  storageSet({
+    analysisState: "idle",
+    lastDate: currentDate,
+    dailyHistory: {},
+    dailyTotals: {
+      date: currentDate,
+      totalMinutes: 0,
+      totalSites: 0,
+      totalVisits: 0,
+    },
+  });
 });
 
 chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "start-analysis") {
-    storageSet({ analysisState: "running", analysisStartedAt: Date.now() })
-      .then(() => aggregateAndStore())
-      .then(() => sendResponse({ ok: true }))
-      .catch((err) => {
-        console.error(err);
-        sendResponse({ ok: false, error: err?.message });
-      });
+    console.log("[histo] start-analysis request");
+    // Always aggregate and store current data before responding
+    (async () => {
+      try {
+        await aggregateAndStore();
+        console.log("[histo] start-analysis complete");
+        sendResponse({ ok: true });
+      } catch (err) {
+        console.error("[histo] start-analysis error:", err);
+        sendResponse({ ok: false, error: (err as Error)?.message });
+      }
+    })();
     return true;
   }
+
+  if (msg?.action === "get-data") {
+    console.log("[histo] get-data request");
+    // Load and return current data
+    (async () => {
+      try {
+        await aggregateAndStore();
+        const data = await storageGet([
+          "siteStats",
+          "categoryStats",
+          "dailyTotals",
+          "dailyHistory",
+        ]);
+        console.log("[histo] get-data response:", data);
+        sendResponse({ ok: true, data });
+      } catch (err) {
+        console.error("[histo] get-data error:", err);
+        sendResponse({ ok: false, error: (err as Error)?.message });
+      }
+    })();
+    return true;
+  }
+
   return undefined;
 });
