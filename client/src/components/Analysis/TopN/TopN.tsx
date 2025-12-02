@@ -68,6 +68,7 @@ export default function TopN() {
                     100
                   ).toFixed(1)}
                   onOpen={openDomain}
+                  showDomain={true}
                 />
               </div>
             ))}
@@ -95,6 +96,7 @@ export default function TopN() {
                     100
                   ).toFixed(1)}
                   onOpen={openDomain}
+                  showDomain={true}
                 />
               </div>
             ))}

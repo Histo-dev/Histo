@@ -5,6 +5,7 @@ interface Props {
   formatedTime: string;
   percentage: string;
   onOpen?: (domain: string) => void;
+  showDomain?: boolean;
 }
 
 interface ISite {
@@ -14,7 +15,13 @@ interface ISite {
   pct?: number;
 }
 
-const Domain = ({ site, formatedTime, percentage, onOpen }: Props) => {
+const Domain = ({
+  site,
+  formatedTime,
+  percentage,
+  onOpen,
+  showDomain = false,
+}: Props) => {
   // Generate favicon URL from domain
   const faviconUrl = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
     site.domain
@@ -32,7 +39,9 @@ const Domain = ({ site, formatedTime, percentage, onOpen }: Props) => {
           e.currentTarget.style.display = "none";
         }}
       />
-      <span className={styles.legendName}>{site.category ?? "기타"}</span>
+      <span className={styles.legendName}>
+        {showDomain ? site.domain : site.category ?? "기타"}
+      </span>
       <div className={styles.time}>{formatedTime}</div>
       <div className={styles.pct}>{percentage}%</div>
       <button className={styles.open} onClick={() => onOpen?.(site.domain)}>
