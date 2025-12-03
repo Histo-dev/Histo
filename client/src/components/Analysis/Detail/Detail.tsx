@@ -1,25 +1,11 @@
+import { useMemo } from "react";
 import styles from "./Detail.module.css";
 import useUsageStore from "../../../store/usageStore";
 import Domain, { type ISite } from "./Domain";
 
 export default function Detail() {
-  // Example final-results view: shows breakdown and CTA
-  const data = {
-    totalTimeMinutes: 245,
-    totalSites: 38,
-    sites: [
-      { domain: "facebook.com", minutes: 120, pct: 35, category: "소셜" },
-      { domain: "youtube.com", minutes: 85, category: "동영상" },
-      { domain: "news.example", minutes: 45, category: "뉴스" },
-    ],
-    categories: [
-      { name: "생산성", minutes: 110, color: "#7c63ff" },
-      { name: "소셜", minutes: 60, color: "#4f39f6" },
-      { name: "동영상", minutes: 40, color: "#f5b357" },
-      { name: "뉴스", minutes: 20, color: "#6ee7b7" },
-      { name: "쇼핑", minutes: 15, color: "#e6e6ef" },
-    ],
-  };
+  const state = useUsageStore();
+  const { siteStats, totalTimeMinutes, loading } = state;
 
   const formatTime = (mins: number) => {
     if (mins >= 60) {
@@ -27,26 +13,54 @@ export default function Detail() {
       const m = mins % 60;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
-    return `${mins}분`;
+    return `${Math.max(0, Math.round(mins))}분`;
   };
 
-  // totals are read inside StatCards; keep the hook active for subscriptions
-  useUsageStore();
+  const openDomain = (domain: string) => {
+    if (typeof chrome === "undefined" || !chrome.tabs?.create) return;
+    chrome.tabs.create({ url: `https://${domain}` });
+  };
+
+  const sites = useMemo(
+    () => [...siteStats].sort((a, b) => b.minutes - a.minutes).slice(0, 10),
+    [siteStats]
+  );
+
+  if (loading)
+    return <div className={styles.contentCenter}>불러오는 중...</div>;
+  if (sites.length === 0)
+    return <div className={styles.contentCenter}>아직 기록이 없습니다.</div>;
 
   return (
     <>
       <div className={styles.legendCol}>
-        {data.sites.map((s) => (
+        {sites.map((s) => (
           <Domain
+            key={s.domain}
             site={s as ISite}
             formatedTime={formatTime(s.minutes)}
-            percentage={((s.minutes / data.totalTimeMinutes) * 100).toFixed(1)}
+            percentage={(
+              (s.minutes / (totalTimeMinutes || s.minutes || 1)) *
+              100
+            ).toFixed(1)}
+            onOpen={openDomain}
           />
         ))}
       </div>
 
       <div className={styles.actions}>
-        <button className={styles.primary}>자세히 보기</button>
+        <button
+          className={styles.primary}
+          onClick={() => {
+            if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+              chrome.tabs.create({
+                url: chrome.runtime.getURL("options.html"),
+              });
+            }
+          }}
+        >
+          설정으로 이동
+        </button>
       </div>
     </>
   );

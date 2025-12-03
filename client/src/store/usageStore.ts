@@ -1,16 +1,10 @@
-import { create } from "zustand"
-
-type UsageState = {
-  totalTimeMinutes: number
-  totalSites: number
-  setTotals: (timeMinutes: number, sites: number) => void
-}
-
-export const useUsageStore = create<UsageState>((set) => ({
-  // initial demo values; real data should be set by background / data layer
-  totalTimeMinutes: 270,
-  totalSites: 24,
-  setTotals: (timeMinutes: number, sites: number) => set({ totalTimeMinutes: timeMinutes, totalSites: sites }),
-}))
-
-export default useUsageStore
+// Re-export from UsageContext for backward compatibility
+export {
+  useUsageStore,
+  UsageProvider,
+  type UsageState,
+  type SiteStat,
+  type CategoryStat,
+  type DailyTotals,
+} from "./UsageContext";
+export { default } from "./UsageContext";

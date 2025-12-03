@@ -1,4 +1,4 @@
-.statCards { display:flex; gap:10px; margin:10px 0 12px }
+.statCards { display:flex; flex-wrap:wrap; gap:10px; margin:10px 0 12px }
 .statCard { flex:1; background:var(--card-bg); padding:12px; border-radius:10px; box-shadow:var(--shadow); text-align:center }
 .statValue { font-size:18px; font-weight:800; color:var(--text) }
 .statLabel { font-size:12px; color:var(--muted); margin-top:6px }

@@ -1,33 +1,27 @@
-import styles from "./CategoryTime.module.css";
+import styles from './CategoryTime.module.css'
 
 interface Props {
-  category: ICategory;
-  percentage: string;
-  formatedMinutes: string;
+  category: ICategory
+  percentage: string
+  formatedMinutes: string
 }
 
 interface ICategory {
-  name: string;
-  minutes: number;
-  color: HexColor;
+  name: string
+  minutes: number
+  color?: string
 }
 
-type HexColor = `#${string}`;
-
 const CategoryTime = ({ category, percentage, formatedMinutes }: Props) => {
+  const color = category.color ?? '#7c63ff'
   return (
     <>
       <div className={styles.categoryInfo}>
-        <div
-          className={styles.categoryColor}
-          aria-hidden
-          style={{ backgroundColor: `${category.color}` }}
-        />
+        <div className={styles.categoryColor} aria-hidden style={{ backgroundColor: color }} />
         <div>
           <div className={styles.categoryName}>{category.name}</div>
           <div className={styles.categoryMeta}>
-            {percentage}% ·{" "}
-            {formatedMinutes}
+            {percentage}% · {formatedMinutes}
           </div>
         </div>
       </div>
@@ -36,14 +30,14 @@ const CategoryTime = ({ category, percentage, formatedMinutes }: Props) => {
           className={styles.bar}
           style={{
             width: `${percentage}%`,
-            backgroundColor: `${category.color}`,
+            background: `linear-gradient(90deg, ${color}, ${color})`,
           }}
         />
       </div>
     </>
-  );
-};
+  )
+}
 
-export default CategoryTime;
+export default CategoryTime
 
-export type { ICategory };
+export type { ICategory }
