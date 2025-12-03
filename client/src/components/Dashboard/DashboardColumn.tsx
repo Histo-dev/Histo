@@ -10,7 +10,8 @@ export default function DashboardColumn() {
       const m = mins % 60;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
-    return `${Math.max(0, Math.round(mins))}분`;
+    const rounded = Math.round(mins * 10) / 10;
+    return `${Math.max(0, rounded)}분`;
   };
 
   const topSites = [...siteStats]

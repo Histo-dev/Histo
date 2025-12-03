@@ -54,6 +54,7 @@ type HistoryRecord = {
 const MAX_VISITS = 1000;
 const MAX_SESSIONS = 500;
 const DAY_KEY = () => new Date().toISOString().slice(0, 10);
+const CURRENT_SESSION_KEY = "currentSession";
 
 const randomId = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -75,6 +76,21 @@ const getDomain = (url: string): string => {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {
     return "unknown";
+  }
+};
+
+const loadPersistedCurrentSession = async (): Promise<Session | null> => {
+  const data = await storageGet<{ currentSession?: Session }>({
+    [CURRENT_SESSION_KEY]: null,
+  });
+  return (data.currentSession as Session) ?? null;
+};
+
+const persistCurrentSession = async (session: Session | null) => {
+  if (session) {
+    await storageSet({ [CURRENT_SESSION_KEY]: session });
+  } else {
+    await storageSet({ [CURRENT_SESSION_KEY]: null });
   }
 };
 
@@ -136,6 +152,7 @@ const checkAndResetIfNewDay = async () => {
       siteStats: {},
       categoryStats: {},
       processedSessionIds: [],
+      [CURRENT_SESSION_KEY]: null,
       dailyTotals: {
         date: currentDate,
         totalMinutes: 0,
@@ -144,6 +161,7 @@ const checkAndResetIfNewDay = async () => {
       },
       lastDate: currentDate,
     });
+    currentSession = null;
     console.log("[histo] new day detected, data reset");
   }
 
@@ -192,6 +210,17 @@ const aggregateAndStore = async () => {
   try {
     // Check if date changed and reset if needed
     await checkAndResetIfNewDay();
+
+    // Restore persisted in-progress session if service worker restarted
+    if (!currentSession) {
+      currentSession = await loadPersistedCurrentSession();
+      if (currentSession) {
+        console.log(
+          "[histo] restored in-progress session from storage",
+          currentSession.domain
+        );
+      }
+    }
 
     const {
       sessions = [],
@@ -362,17 +391,17 @@ const aggregateAndStore = async () => {
 
     console.log("[histo] totalMinutes before rounding:", totalMinutes);
 
-    // Round totalMinutes first to use accurate total for percentage calculation
-    const roundedTotalMinutes = Math.round(totalMinutes);
+    // Keep one decimal place so short sessions don't round down to zero
+    const roundedTotalMinutes = Math.round(totalMinutes * 10) / 10;
 
     Object.values(siteStats).forEach((s) => {
-      s.minutes = Math.round(s.minutes);
+      s.minutes = Math.round(s.minutes * 10) / 10;
       s.pctOfDay = roundedTotalMinutes
         ? Math.round((s.minutes / roundedTotalMinutes) * 1000) / 10
         : 0;
     });
     Object.values(categoryStats).forEach((c) => {
-      c.minutes = Math.round(c.minutes);
+      c.minutes = Math.round(c.minutes * 10) / 10;
       c.sites = Object.values(siteStats).filter(
         (s) => s.category === c.name
       ).length;
@@ -436,6 +465,7 @@ const endSession = async (reason: string) => {
   const durationMs = Math.max(0, end - currentSession.start);
   const session: Session = { ...currentSession, end, durationMs };
   currentSession = null;
+  await persistCurrentSession(null);
   await appendSession(session);
   console.log("[histo] session ended", reason, {
     domain: session.domain,
@@ -466,6 +496,7 @@ const startSession = async (
     tabId,
     windowId,
   };
+  await persistCurrentSession(currentSession);
   console.log("[histo] session started", domain);
 };
 
@@ -527,6 +558,7 @@ chrome.runtime.onInstalled?.addListener(() => {
     analysisState: "idle",
     lastDate: currentDate,
     dailyHistory: {},
+    [CURRENT_SESSION_KEY]: null,
     dailyTotals: {
       date: currentDate,
       totalMinutes: 0,
@@ -583,6 +615,16 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     aggregateAndStore().catch(console.error);
   }
 });
+
+// Try to restore any persisted in-progress session at startup
+loadPersistedCurrentSession()
+  .then((session) => {
+    if (session) {
+      currentSession = session;
+      console.log("[histo] session restored on startup", session.domain);
+    }
+  })
+  .catch((err) => console.error("[histo] failed to restore session", err));
 
 // Expose functions for console debugging
 (globalThis as any).histoDebug = {

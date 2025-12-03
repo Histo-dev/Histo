@@ -3,6 +3,7 @@
   var MAX_VISITS = 1e3;
   var MAX_SESSIONS = 500;
   var DAY_KEY = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  var CURRENT_SESSION_KEY = "currentSession";
   var randomId = () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   var storageGet = (keys) => new Promise(
     (resolve) => chrome.storage.local.get(keys ?? null, (res) => resolve(res))
@@ -15,6 +16,19 @@
       return new URL(url).hostname.replace(/^www\./, "");
     } catch {
       return "unknown";
+    }
+  };
+  var loadPersistedCurrentSession = async () => {
+    const data = await storageGet({
+      [CURRENT_SESSION_KEY]: null
+    });
+    return data.currentSession ?? null;
+  };
+  var persistCurrentSession = async (session) => {
+    if (session) {
+      await storageSet({ [CURRENT_SESSION_KEY]: session });
+    } else {
+      await storageSet({ [CURRENT_SESSION_KEY]: null });
     }
   };
   var appendVisit = async (visit) => {
@@ -60,6 +74,7 @@
         siteStats: {},
         categoryStats: {},
         processedSessionIds: [],
+        [CURRENT_SESSION_KEY]: null,
         dailyTotals: {
           date: currentDate,
           totalMinutes: 0,
@@ -68,6 +83,7 @@
         },
         lastDate: currentDate
       });
+      currentSession = null;
       console.log("[histo] new day detected, data reset");
     }
     if (!lastDate) {
@@ -92,6 +108,15 @@
     console.log("[histo] aggregateAndStore starting");
     try {
       await checkAndResetIfNewDay();
+      if (!currentSession) {
+        currentSession = await loadPersistedCurrentSession();
+        if (currentSession) {
+          console.log(
+            "[histo] restored in-progress session from storage",
+            currentSession.domain
+          );
+        }
+      }
       const {
         sessions = [],
         visits = [],
@@ -113,9 +138,16 @@
         siteStatsCount: Object.keys(existingSiteStats || {}).length
       });
       const currentSessionIds = new Set(sessions.map((s) => s.id));
-      const validProcessedIds = (processedSessionIds || []).filter((id) => currentSessionIds.has(id));
+      const validProcessedIds = (processedSessionIds || []).filter(
+        (id) => currentSessionIds.has(id)
+      );
       if (validProcessedIds.length < (processedSessionIds?.length || 0)) {
-        console.log("[histo] trimmed processedIds:", validProcessedIds.length, "from", processedSessionIds?.length);
+        console.log(
+          "[histo] trimmed processedIds:",
+          validProcessedIds.length,
+          "from",
+          processedSessionIds?.length
+        );
       }
       let allSessions = [...sessions];
       if (currentSession) {
@@ -217,13 +249,13 @@
         totalMinutes += s.minutes || 0;
       });
       console.log("[histo] totalMinutes before rounding:", totalMinutes);
-      const roundedTotalMinutes = Math.round(totalMinutes);
+      const roundedTotalMinutes = Math.round(totalMinutes * 10) / 10;
       Object.values(siteStats).forEach((s) => {
-        s.minutes = Math.round(s.minutes);
+        s.minutes = Math.round(s.minutes * 10) / 10;
         s.pctOfDay = roundedTotalMinutes ? Math.round(s.minutes / roundedTotalMinutes * 1e3) / 10 : 0;
       });
       Object.values(categoryStats).forEach((c) => {
-        c.minutes = Math.round(c.minutes);
+        c.minutes = Math.round(c.minutes * 10) / 10;
         c.sites = Object.values(siteStats).filter(
           (s) => s.category === c.name
         ).length;
@@ -280,6 +312,7 @@
     const durationMs = Math.max(0, end - currentSession.start);
     const session = { ...currentSession, end, durationMs };
     currentSession = null;
+    await persistCurrentSession(null);
     await appendSession(session);
     console.log("[histo] session ended", reason, {
       domain: session.domain,
@@ -302,6 +335,7 @@
       tabId,
       windowId
     };
+    await persistCurrentSession(currentSession);
     console.log("[histo] session started", domain);
   };
   chrome.history?.onVisited?.addListener((item) => {
@@ -355,6 +389,7 @@
       analysisState: "idle",
       lastDate: currentDate,
       dailyHistory: {},
+      [CURRENT_SESSION_KEY]: null,
       dailyTotals: {
         date: currentDate,
         totalMinutes: 0,
@@ -398,6 +433,12 @@
       aggregateAndStore().catch(console.error);
     }
   });
+  loadPersistedCurrentSession().then((session) => {
+    if (session) {
+      currentSession = session;
+      console.log("[histo] session restored on startup", session.domain);
+    }
+  }).catch((err) => console.error("[histo] failed to restore session", err));
   globalThis.histoDebug = {
     testAggregate: () => aggregateAndStore(),
     checkStorage: () => storageGet(["siteStats", "processedSessionIds", "sessions"]).then(
