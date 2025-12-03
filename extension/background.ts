@@ -222,6 +222,21 @@ const aggregateAndStore = async () => {
       siteStatsCount: Object.keys(existingSiteStats || {}).length,
     });
 
+    // Clean processedSessionIds: only keep IDs that are still in current sessions
+    const currentSessionIds = new Set(sessions.map((s) => s.id));
+    const validProcessedIds = (processedSessionIds || []).filter((id) =>
+      currentSessionIds.has(id)
+    );
+
+    if (validProcessedIds.length < (processedSessionIds?.length || 0)) {
+      console.log(
+        "[histo] trimmed processedIds:",
+        validProcessedIds.length,
+        "from",
+        processedSessionIds?.length
+      );
+    }
+
     // Include current session in calculation but don't modify it
     let allSessions = [...sessions];
     if (currentSession) {
@@ -262,10 +277,13 @@ const aggregateAndStore = async () => {
     );
 
     let totalMinutes = 0;
-    let newProcessedIds = [...(processedSessionIds || [])];
+    let newProcessedIds = [...validProcessedIds]; // Use cleaned processedIds
 
     // Only process NEW sessions
     let newSessionsCount = 0;
+    let totalNewMinutes = 0;
+    const processedSessionDetails = [];
+
     allSessions.forEach((s) => {
       if (newProcessedIds.includes(s.id)) {
         // Already processed, skip
@@ -274,8 +292,15 @@ const aggregateAndStore = async () => {
 
       const durationMs = s.durationMs ?? (s.end ? s.end - s.start : 0);
       const minutes = Math.max(0, durationMs) / 60000;
+      totalNewMinutes += minutes;
       totalMinutes += minutes;
       const domain = s.domain;
+
+      processedSessionDetails.push({
+        domain,
+        durationMs,
+        minutes: Math.round(minutes * 100) / 100,
+      });
 
       if (!siteStats[domain]) {
         siteStats[domain] = {
@@ -313,13 +338,29 @@ const aggregateAndStore = async () => {
       "[histo] processed sessions:",
       newSessionsCount,
       "new processedIds count:",
-      newProcessedIds.length
+      newProcessedIds.length,
+      "new minutes:",
+      Math.round(totalNewMinutes * 100) / 100,
+      "details:",
+      processedSessionDetails.slice(0, 3)
     );
+
+    // Log siteStats before calculation
+    console.log("[histo] siteStats keys:", Object.keys(siteStats).length);
+    console.log(
+      "[histo] siteStats minutes:",
+      Object.values(siteStats)
+        .map((s) => ({ domain: s.domain, minutes: s.minutes }))
+        .slice(0, 5)
+    );
+
     // Calculate total minutes from final siteStats (all accumulated data)
     totalMinutes = 0;
     Object.values(siteStats).forEach((s) => {
       totalMinutes += s.minutes || 0;
     });
+
+    console.log("[histo] totalMinutes before rounding:", totalMinutes);
 
     // Round totalMinutes first to use accurate total for percentage calculation
     const roundedTotalMinutes = Math.round(totalMinutes);
@@ -396,7 +437,11 @@ const endSession = async (reason: string) => {
   const session: Session = { ...currentSession, end, durationMs };
   currentSession = null;
   await appendSession(session);
-  console.log("[histo] session ended", reason, session);
+  console.log("[histo] session ended", reason, {
+    domain: session.domain,
+    durationMs,
+    minutes: Math.round((durationMs / 60000) * 1000) / 1000,
+  });
 
   // Schedule aggregation asynchronously (don't wait for it)
   // This prevents blocking and service worker termination
