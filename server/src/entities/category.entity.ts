@@ -1,0 +1,18 @@
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { History } from './history.entity';
+import { UserCategory } from './user-category.entity';
+
+@Entity('Category')
+export class Category {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'varchar', length: 255, unique: true })
+  name: string;
+
+  @OneToMany(() => History, (history) => history.category)
+  histories: History[];
+
+  @OneToMany(() => UserCategory, (userCategory) => userCategory.category)
+  userCategories: UserCategory[];
+}
