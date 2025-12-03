@@ -69,6 +69,12 @@ const Domain = ({
     ) {
       return "https://github.githubassets.com/favicons/favicon.ico";
     }
+    if (
+      lowercaseDomain.includes("konkuk.ac.kr") ||
+      lowercaseDomain === "konkuk.ac.kr"
+    ) {
+      return "https://www.konkuk.ac.kr/favicon.ico";
+    }
 
     // Fallback to DuckDuckGo Icon API (better than Google's)
     return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
@@ -84,8 +90,9 @@ const Domain = ({
         className={styles.favicon}
         title={site.domain}
         onError={(e) => {
-          // Fallback to Google favicon if DuckDuckGo fails
-          if (!e.currentTarget.src.includes("google.com/s2/favicons")) {
+          const src = e.currentTarget.src;
+          // Try Google favicon as fallback
+          if (!src.includes("google.com/s2/favicons")) {
             e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
               site.domain
             )}&sz=32`;

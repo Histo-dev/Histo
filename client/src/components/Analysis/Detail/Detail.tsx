@@ -22,7 +22,10 @@ export default function Detail() {
   };
 
   const sites = useMemo(
-    () => [...siteStats].sort((a, b) => b.minutes - a.minutes).slice(0, 10),
+    () =>
+      [...siteStats]
+        .sort((a, b) => (b.lastVisited || 0) - (a.lastVisited || 0))
+        .slice(0, 10),
     [siteStats]
   );
 
@@ -44,6 +47,7 @@ export default function Detail() {
               100
             ).toFixed(1)}
             onOpen={openDomain}
+            showDomain={true}
           />
         ))}
       </div>

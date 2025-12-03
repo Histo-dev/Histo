@@ -9,10 +9,9 @@ import { UsageProvider } from "./store/UsageContext";
 
 const MIN_LOADING_MS = 1000;
 
-function PopUpRoutes() {
+function PopUpRoutes({ onRefresh }: { onRefresh: () => void }) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const startAnalysis = () => {
     setIsLoading(true);
@@ -22,9 +21,9 @@ function PopUpRoutes() {
       const elapsed = Date.now() - start;
       const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
       setTimeout(() => {
-        // Force refresh of data by changing key
-        setRefreshKey((prev) => prev + 1);
         setIsLoading(false);
+        // Trigger data reload in UsageProvider
+        onRefresh();
         navigate("/analysis/overview");
       }, remaining);
     });
@@ -37,19 +36,23 @@ function PopUpRoutes() {
       <Route path="/" element={<HistoIntro onStart={startAnalysis} />} />
       <Route
         path="/analysis/*"
-        element={<Analysis onBack={() => navigate("/")} key={refreshKey} />}
+        element={<Analysis onBack={() => navigate("/")} />}
       />
     </Routes>
   );
 }
 
 function PopUpApp() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   return (
-    <UsageProvider>
+    <UsageProvider triggerRefresh={refreshTrigger}>
       <div className="extension-root">
         <div className="extension-panel">
           <MemoryRouter>
-            <PopUpRoutes />
+            <PopUpRoutes
+              onRefresh={() => setRefreshTrigger((prev) => prev + 1)}
+            />
           </MemoryRouter>
         </div>
       </div>

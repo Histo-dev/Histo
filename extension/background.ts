@@ -135,6 +135,7 @@ const checkAndResetIfNewDay = async () => {
       visits: [],
       siteStats: {},
       categoryStats: {},
+      processedSessionIds: [],
       dailyTotals: {
         date: currentDate,
         totalMinutes: 0,
@@ -187,116 +188,213 @@ const categorize = (
 };
 
 const aggregateAndStore = async () => {
-  // Check if date changed and reset if needed
-  await checkAndResetIfNewDay();
+  console.log("[histo] aggregateAndStore starting");
+  try {
+    // Check if date changed and reset if needed
+    await checkAndResetIfNewDay();
 
-  const {
-    sessions = [],
-    visits = [],
-    categoryMap = {},
-  } = await storageGet<{
-    sessions: Session[];
-    visits: Visit[];
-    categoryMap?: Record<string, string>;
-  }>(["sessions", "visits", "categoryMap"]);
+    const {
+      sessions = [],
+      visits = [],
+      categoryMap = {},
+      siteStats: existingSiteStats = {},
+      categoryStats: existingCategoryStats = {},
+      processedSessionIds = [],
+    } = await storageGet<{
+      sessions: Session[];
+      visits: Visit[];
+      categoryMap?: Record<string, string>;
+      siteStats?: Record<string, SiteStat>;
+      categoryStats?: Record<string, CategoryStat>;
+      processedSessionIds?: string[];
+    }>([
+      "sessions",
+      "visits",
+      "categoryMap",
+      "siteStats",
+      "categoryStats",
+      "processedSessionIds",
+    ]);
 
-  // Close current session if still open
-  if (currentSession) {
-    const end = Date.now();
-    const durationMs = Math.max(0, end - currentSession.start);
-    const session: Session = { ...currentSession, end, durationMs };
-    sessions.push(session);
-    currentSession = null;
-  }
+    // Include current session in calculation but don't modify it
+    let allSessions = [...sessions];
+    if (currentSession) {
+      const end = Date.now();
+      const durationMs = Math.max(0, end - currentSession.start);
+      allSessions.push({
+        ...currentSession,
+        end,
+        durationMs,
+      } as Session);
+    }
 
-  if (!Array.isArray(sessions) || sessions.length === 0) {
+    if (!Array.isArray(allSessions) || allSessions.length === 0) {
+      await storageSet({
+        siteStats: existingSiteStats,
+        categoryStats: existingCategoryStats,
+        dailyTotals: {
+          date: DAY_KEY(),
+          totalMinutes: Object.values(existingSiteStats).reduce(
+            (sum, s) => sum + (s.minutes || 0),
+            0
+          ),
+          totalSites: Object.keys(existingSiteStats).length,
+          totalVisits: visits.length,
+        } satisfies DailyTotal,
+        analysisState: "idle",
+        lastAggregatedAt: Date.now(),
+      });
+      return;
+    }
+
+    // Start with existing stats
+    const siteStats: Record<string, SiteStat> = JSON.parse(
+      JSON.stringify(existingSiteStats || {})
+    );
+    const categoryStats: Record<string, CategoryStat> = JSON.parse(
+      JSON.stringify(existingCategoryStats || {})
+    );
+
+    let totalMinutes = 0;
+    let newProcessedIds = [...(processedSessionIds || [])];
+
+    // Only process NEW sessions
+    allSessions.forEach((s) => {
+      if (newProcessedIds.includes(s.id)) {
+        // Already processed, skip
+        return;
+      }
+
+      const durationMs = s.durationMs ?? (s.end ? s.end - s.start : 0);
+      const minutes = Math.max(0, durationMs) / 60000;
+      totalMinutes += minutes;
+      const domain = s.domain;
+
+      if (!siteStats[domain]) {
+        siteStats[domain] = {
+          domain,
+          minutes: 0,
+          visits: 0,
+          lastVisited: s.end ?? s.start,
+        };
+      }
+      siteStats[domain].minutes += minutes;
+      siteStats[domain].visits += 1;
+      siteStats[domain].lastVisited = Math.max(
+        siteStats[domain].lastVisited,
+        s.end ?? s.start
+      );
+
+      const cat = categorize(
+        domain,
+        s.url,
+        categoryMap as Record<string, string>
+      );
+      siteStats[domain].category = cat;
+
+      if (!categoryStats[cat])
+        categoryStats[cat] = { name: cat, minutes: 0, visits: 0, sites: 0 };
+      categoryStats[cat].minutes += minutes;
+      categoryStats[cat].visits += 1;
+
+      // Mark this session as processed
+      newProcessedIds.push(s.id);
+    });
+
+    // Calculate total minutes from final siteStats (all accumulated data)
+    totalMinutes = 0;
+    Object.values(siteStats).forEach((s) => {
+      totalMinutes += s.minutes || 0;
+    });
+
+    // Round totalMinutes first to use accurate total for percentage calculation
+    const roundedTotalMinutes = Math.round(totalMinutes);
+
+    Object.values(siteStats).forEach((s) => {
+      s.minutes = Math.round(s.minutes);
+      s.pctOfDay = roundedTotalMinutes
+        ? Math.round((s.minutes / roundedTotalMinutes) * 1000) / 10
+        : 0;
+    });
+    Object.values(categoryStats).forEach((c) => {
+      c.minutes = Math.round(c.minutes);
+      c.sites = Object.values(siteStats).filter(
+        (s) => s.category === c.name
+      ).length;
+    });
+
+    // Recalculate category stats from siteStats to ensure consistency
+    const finalCategoryStats: Record<string, CategoryStat> = {};
+    Object.values(siteStats).forEach((s) => {
+      if (!s.category) return;
+      if (!finalCategoryStats[s.category]) {
+        finalCategoryStats[s.category] = {
+          name: s.category,
+          minutes: 0,
+          visits: 0,
+          sites: 0,
+        };
+      }
+      finalCategoryStats[s.category].minutes += s.minutes || 0;
+      finalCategoryStats[s.category].visits += s.visits || 0;
+    });
+    // Count unique sites per category
+    Object.values(finalCategoryStats).forEach((c) => {
+      c.sites = Object.values(siteStats).filter(
+        (s) => s.category === c.name
+      ).length;
+    });
+
+    const dailyTotals: DailyTotal = {
+      date: DAY_KEY(),
+      totalMinutes: roundedTotalMinutes,
+      totalSites: Object.keys(siteStats).length,
+      totalVisits: visits.length,
+    };
+
     await storageSet({
-      siteStats: {},
-      categoryStats: {},
-      dailyTotals: {
-        date: DAY_KEY(),
-        totalMinutes: 0,
-        totalSites: 0,
-        totalVisits: visits.length,
-      } satisfies DailyTotal,
+      siteStats,
+      categoryStats: finalCategoryStats,
+      dailyTotals,
+      processedSessionIds: newProcessedIds,
+      // Keep sessions - they accumulate throughout the day
+      // Only cleared on daily reset
       analysisState: "idle",
       lastAggregatedAt: Date.now(),
     });
-    return;
+    console.log("[histo] aggregateAndStore completed successfully");
+  } catch (err) {
+    console.error("[histo] aggregateAndStore error:", err);
+    throw err;
   }
-
-  const siteStats: Record<string, SiteStat> = {};
-  const categoryStats: Record<string, CategoryStat> = {};
-
-  let totalMinutes = 0;
-
-  sessions.forEach((s) => {
-    const durationMs = s.durationMs ?? (s.end ? s.end - s.start : 0);
-    const minutes = Math.max(0, durationMs) / 60000;
-    totalMinutes += minutes;
-    const domain = s.domain;
-
-    if (!siteStats[domain]) {
-      siteStats[domain] = {
-        domain,
-        minutes: 0,
-        visits: 0,
-        lastVisited: s.end ?? s.start,
-      };
-    }
-    siteStats[domain].minutes += minutes;
-    siteStats[domain].visits += 1;
-    siteStats[domain].lastVisited = Math.max(
-      siteStats[domain].lastVisited,
-      s.end ?? s.start
-    );
-
-    const cat = categorize(
-      domain,
-      s.url,
-      categoryMap as Record<string, string>
-    );
-    siteStats[domain].category = cat;
-
-    if (!categoryStats[cat])
-      categoryStats[cat] = { name: cat, minutes: 0, visits: 0, sites: 0 };
-    categoryStats[cat].minutes += minutes;
-    categoryStats[cat].visits += 1;
-  });
-
-  // Round totalMinutes first to use accurate total for percentage calculation
-  const roundedTotalMinutes = Math.round(totalMinutes);
-
-  Object.values(siteStats).forEach((s) => {
-    s.minutes = Math.round(s.minutes);
-    s.pctOfDay = roundedTotalMinutes
-      ? Math.round((s.minutes / roundedTotalMinutes) * 1000) / 10
-      : 0;
-  });
-  Object.values(categoryStats).forEach((c) => {
-    c.minutes = Math.round(c.minutes);
-    c.sites = Object.values(siteStats).filter(
-      (s) => s.category === c.name
-    ).length;
-  });
-
-  const dailyTotals: DailyTotal = {
-    date: DAY_KEY(),
-    totalMinutes: roundedTotalMinutes,
-    totalSites: Object.keys(siteStats).length,
-    totalVisits: visits.length,
-  };
-
-  await storageSet({
-    siteStats,
-    categoryStats,
-    dailyTotals,
-    analysisState: "idle",
-    lastAggregatedAt: Date.now(),
-  });
 };
 
 let currentSession: Session | null = null;
+let lastAggregateTime = 0;
+let aggregateTimer: NodeJS.Timeout | null = null;
+
+// Debounced aggregation - only run once per 2 seconds at most
+const scheduleAggregate = async () => {
+  const now = Date.now();
+  const timeSinceLastAggregate = now - lastAggregateTime;
+
+  // Clear existing timer
+  if (aggregateTimer) clearTimeout(aggregateTimer);
+
+  if (timeSinceLastAggregate >= 2000) {
+    // Enough time has passed, run immediately
+    lastAggregateTime = now;
+    await aggregateAndStore().catch(console.error);
+  } else {
+    // Schedule for later to debounce rapid session switches
+    const delayMs = 2000 - timeSinceLastAggregate;
+    aggregateTimer = setTimeout(async () => {
+      lastAggregateTime = Date.now();
+      await aggregateAndStore().catch(console.error);
+      aggregateTimer = null;
+    }, delayMs);
+  }
+};
 
 const endSession = async (reason: string) => {
   if (!currentSession) return;
@@ -305,7 +403,8 @@ const endSession = async (reason: string) => {
   const session: Session = { ...currentSession, end, durationMs };
   currentSession = null;
   await appendSession(session);
-  await aggregateAndStore();
+  // Schedule aggregation with debouncing
+  await scheduleAggregate();
   console.log("[histo] session ended", reason, session);
 };
 
@@ -399,38 +498,48 @@ chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "start-analysis") {
     console.log("[histo] start-analysis request");
     // Always aggregate and store current data before responding
-    (async () => {
-      try {
-        await aggregateAndStore();
+    aggregateAndStore()
+      .then(() => {
         console.log("[histo] start-analysis complete");
         sendResponse({ ok: true });
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error("[histo] start-analysis error:", err);
         sendResponse({ ok: false, error: (err as Error)?.message });
-      }
-    })();
+      });
     return true;
   }
 
   if (msg?.action === "get-data") {
     console.log("[histo] get-data request");
     // Load and return current data
-    (async () => {
-      try {
-        await aggregateAndStore();
-        const data = await storageGet([
+    Promise.resolve()
+      .then(() => aggregateAndStore())
+      .then(() => {
+        console.log("[histo] aggregation complete, fetching data");
+        return storageGet([
           "siteStats",
           "categoryStats",
           "dailyTotals",
           "dailyHistory",
         ]);
-        console.log("[histo] get-data response:", data);
-        sendResponse({ ok: true, data });
-      } catch (err) {
+      })
+      .then((data) => {
+        console.log("[histo] get-data response with data:", data);
+        try {
+          sendResponse({ ok: true, data });
+        } catch (e) {
+          console.error("[histo] sendResponse error:", e);
+        }
+      })
+      .catch((err) => {
         console.error("[histo] get-data error:", err);
-        sendResponse({ ok: false, error: (err as Error)?.message });
-      }
-    })();
+        try {
+          sendResponse({ ok: false, error: (err as Error)?.message });
+        } catch (e) {
+          console.error("[histo] sendResponse error on catch:", e);
+        }
+      });
     return true;
   }
 

@@ -59,6 +59,7 @@
         visits: [],
         siteStats: {},
         categoryStats: {},
+        processedSessionIds: [],
         dailyTotals: {
           date: currentDate,
           totalMinutes: 0,
@@ -88,93 +89,155 @@
     return "\uAE30\uD0C0";
   };
   var aggregateAndStore = async () => {
-    await checkAndResetIfNewDay();
-    const {
-      sessions = [],
-      visits = [],
-      categoryMap = {}
-    } = await storageGet(["sessions", "visits", "categoryMap"]);
-    if (currentSession) {
-      const end = Date.now();
-      const durationMs = Math.max(0, end - currentSession.start);
-      const session = { ...currentSession, end, durationMs };
-      sessions.push(session);
-      currentSession = null;
-    }
-    if (!Array.isArray(sessions) || sessions.length === 0) {
+    console.log("[histo] aggregateAndStore starting");
+    try {
+      await checkAndResetIfNewDay();
+      const {
+        sessions = [],
+        visits = [],
+        categoryMap = {},
+        siteStats: existingSiteStats = {},
+        categoryStats: existingCategoryStats = {},
+        processedSessionIds = []
+      } = await storageGet(["sessions", "visits", "categoryMap", "siteStats", "categoryStats", "processedSessionIds"]);
+      let allSessions = [...sessions];
+      if (currentSession) {
+        const end = Date.now();
+        const durationMs = Math.max(0, end - currentSession.start);
+        allSessions.push({
+          ...currentSession,
+          end,
+          durationMs
+        });
+      }
+      if (!Array.isArray(allSessions) || allSessions.length === 0) {
+        await storageSet({
+          siteStats: existingSiteStats,
+          categoryStats: existingCategoryStats,
+          dailyTotals: {
+            date: DAY_KEY(),
+            totalMinutes: Object.values(existingSiteStats).reduce((sum, s) => sum + (s.minutes || 0), 0),
+            totalSites: Object.keys(existingSiteStats).length,
+            totalVisits: visits.length
+          },
+          analysisState: "idle",
+          lastAggregatedAt: Date.now()
+        });
+        return;
+      }
+      const siteStats = JSON.parse(JSON.stringify(existingSiteStats || {}));
+      const categoryStats = JSON.parse(JSON.stringify(existingCategoryStats || {}));
+      let totalMinutes = 0;
+      let newProcessedIds = [...processedSessionIds || []];
+      allSessions.forEach((s) => {
+        if (newProcessedIds.includes(s.id)) {
+          return;
+        }
+        const durationMs = s.durationMs ?? (s.end ? s.end - s.start : 0);
+        const minutes = Math.max(0, durationMs) / 6e4;
+        totalMinutes += minutes;
+        const domain = s.domain;
+        if (!siteStats[domain]) {
+          siteStats[domain] = {
+            domain,
+            minutes: 0,
+            visits: 0,
+            lastVisited: s.end ?? s.start
+          };
+        }
+        siteStats[domain].minutes += minutes;
+        siteStats[domain].visits += 1;
+        siteStats[domain].lastVisited = Math.max(
+          siteStats[domain].lastVisited,
+          s.end ?? s.start
+        );
+        const cat = categorize(
+          domain,
+          s.url,
+          categoryMap
+        );
+        siteStats[domain].category = cat;
+        if (!categoryStats[cat])
+          categoryStats[cat] = { name: cat, minutes: 0, visits: 0, sites: 0 };
+        categoryStats[cat].minutes += minutes;
+        categoryStats[cat].visits += 1;
+        newProcessedIds.push(s.id);
+      });
+      totalMinutes = 0;
+      Object.values(siteStats).forEach((s) => {
+        totalMinutes += s.minutes || 0;
+      });
+      const roundedTotalMinutes = Math.round(totalMinutes);
+      Object.values(siteStats).forEach((s) => {
+        s.minutes = Math.round(s.minutes);
+        s.pctOfDay = roundedTotalMinutes ? Math.round(s.minutes / roundedTotalMinutes * 1e3) / 10 : 0;
+      });
+      Object.values(categoryStats).forEach((c) => {
+        c.minutes = Math.round(c.minutes);
+        c.sites = Object.values(siteStats).filter(
+          (s) => s.category === c.name
+        ).length;
+      });
+      const finalCategoryStats = {};
+      Object.values(siteStats).forEach((s) => {
+        if (!s.category) return;
+        if (!finalCategoryStats[s.category]) {
+          finalCategoryStats[s.category] = {
+            name: s.category,
+            minutes: 0,
+            visits: 0,
+            sites: 0
+          };
+        }
+        finalCategoryStats[s.category].minutes += s.minutes || 0;
+        finalCategoryStats[s.category].visits += s.visits || 0;
+      });
+      Object.values(finalCategoryStats).forEach((c) => {
+        c.sites = Object.values(siteStats).filter(
+          (s) => s.category === c.name
+        ).length;
+      });
+      const dailyTotals = {
+        date: DAY_KEY(),
+        totalMinutes: roundedTotalMinutes,
+        totalSites: Object.keys(siteStats).length,
+        totalVisits: visits.length
+      };
       await storageSet({
-        siteStats: {},
-        categoryStats: {},
-        dailyTotals: {
-          date: DAY_KEY(),
-          totalMinutes: 0,
-          totalSites: 0,
-          totalVisits: visits.length
-        },
+        siteStats,
+        categoryStats: finalCategoryStats,
+        dailyTotals,
+        processedSessionIds: newProcessedIds,
+        // Keep sessions - they accumulate throughout the day
+        // Only cleared on daily reset
         analysisState: "idle",
         lastAggregatedAt: Date.now()
       });
-      return;
+      console.log("[histo] aggregateAndStore completed successfully");
+    } catch (err) {
+      console.error("[histo] aggregateAndStore error:", err);
+      throw err;
     }
-    const siteStats = {};
-    const categoryStats = {};
-    let totalMinutes = 0;
-    sessions.forEach((s) => {
-      const durationMs = s.durationMs ?? (s.end ? s.end - s.start : 0);
-      const minutes = Math.max(0, durationMs) / 6e4;
-      totalMinutes += minutes;
-      const domain = s.domain;
-      if (!siteStats[domain]) {
-        siteStats[domain] = {
-          domain,
-          minutes: 0,
-          visits: 0,
-          lastVisited: s.end ?? s.start
-        };
-      }
-      siteStats[domain].minutes += minutes;
-      siteStats[domain].visits += 1;
-      siteStats[domain].lastVisited = Math.max(
-        siteStats[domain].lastVisited,
-        s.end ?? s.start
-      );
-      const cat = categorize(
-        domain,
-        s.url,
-        categoryMap
-      );
-      siteStats[domain].category = cat;
-      if (!categoryStats[cat])
-        categoryStats[cat] = { name: cat, minutes: 0, visits: 0, sites: 0 };
-      categoryStats[cat].minutes += minutes;
-      categoryStats[cat].visits += 1;
-    });
-    const roundedTotalMinutes = Math.round(totalMinutes);
-    Object.values(siteStats).forEach((s) => {
-      s.minutes = Math.round(s.minutes);
-      s.pctOfDay = roundedTotalMinutes ? Math.round(s.minutes / roundedTotalMinutes * 1e3) / 10 : 0;
-    });
-    Object.values(categoryStats).forEach((c) => {
-      c.minutes = Math.round(c.minutes);
-      c.sites = Object.values(siteStats).filter(
-        (s) => s.category === c.name
-      ).length;
-    });
-    const dailyTotals = {
-      date: DAY_KEY(),
-      totalMinutes: roundedTotalMinutes,
-      totalSites: Object.keys(siteStats).length,
-      totalVisits: visits.length
-    };
-    await storageSet({
-      siteStats,
-      categoryStats,
-      dailyTotals,
-      analysisState: "idle",
-      lastAggregatedAt: Date.now()
-    });
   };
   var currentSession = null;
+  var lastAggregateTime = 0;
+  var aggregateTimer = null;
+  var scheduleAggregate = async () => {
+    const now = Date.now();
+    const timeSinceLastAggregate = now - lastAggregateTime;
+    if (aggregateTimer) clearTimeout(aggregateTimer);
+    if (timeSinceLastAggregate >= 2e3) {
+      lastAggregateTime = now;
+      await aggregateAndStore().catch(console.error);
+    } else {
+      const delayMs = 2e3 - timeSinceLastAggregate;
+      aggregateTimer = setTimeout(async () => {
+        lastAggregateTime = Date.now();
+        await aggregateAndStore().catch(console.error);
+        aggregateTimer = null;
+      }, delayMs);
+    }
+  };
   var endSession = async (reason) => {
     if (!currentSession) return;
     const end = Date.now();
@@ -182,7 +245,7 @@
     const session = { ...currentSession, end, durationMs };
     currentSession = null;
     await appendSession(session);
-    await aggregateAndStore();
+    await scheduleAggregate();
     console.log("[histo] session ended", reason, session);
   };
   var startSession = async (url, tabId, windowId) => {
@@ -261,36 +324,40 @@
   chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
     if (msg?.action === "start-analysis") {
       console.log("[histo] start-analysis request");
-      (async () => {
-        try {
-          await aggregateAndStore();
-          console.log("[histo] start-analysis complete");
-          sendResponse({ ok: true });
-        } catch (err) {
-          console.error("[histo] start-analysis error:", err);
-          sendResponse({ ok: false, error: err?.message });
-        }
-      })();
+      aggregateAndStore().then(() => {
+        console.log("[histo] start-analysis complete");
+        sendResponse({ ok: true });
+      }).catch((err) => {
+        console.error("[histo] start-analysis error:", err);
+        sendResponse({ ok: false, error: err?.message });
+      });
       return true;
     }
     if (msg?.action === "get-data") {
       console.log("[histo] get-data request");
-      (async () => {
+      Promise.resolve().then(() => aggregateAndStore()).then(() => {
+        console.log("[histo] aggregation complete, fetching data");
+        return storageGet([
+          "siteStats",
+          "categoryStats",
+          "dailyTotals",
+          "dailyHistory"
+        ]);
+      }).then((data) => {
+        console.log("[histo] get-data response with data:", data);
         try {
-          await aggregateAndStore();
-          const data = await storageGet([
-            "siteStats",
-            "categoryStats",
-            "dailyTotals",
-            "dailyHistory"
-          ]);
-          console.log("[histo] get-data response:", data);
           sendResponse({ ok: true, data });
-        } catch (err) {
-          console.error("[histo] get-data error:", err);
-          sendResponse({ ok: false, error: err?.message });
+        } catch (e) {
+          console.error("[histo] sendResponse error:", e);
         }
-      })();
+      }).catch((err) => {
+        console.error("[histo] get-data error:", err);
+        try {
+          sendResponse({ ok: false, error: err?.message });
+        } catch (e) {
+          console.error("[histo] sendResponse error on catch:", e);
+        }
+      });
       return true;
     }
     return void 0;
