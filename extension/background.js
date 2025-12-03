@@ -99,7 +99,19 @@
         siteStats: existingSiteStats = {},
         categoryStats: existingCategoryStats = {},
         processedSessionIds = []
-      } = await storageGet(["sessions", "visits", "categoryMap", "siteStats", "categoryStats", "processedSessionIds"]);
+      } = await storageGet([
+        "sessions",
+        "visits",
+        "categoryMap",
+        "siteStats",
+        "categoryStats",
+        "processedSessionIds"
+      ]);
+      console.log("[histo] loaded data:", {
+        sessionsCount: sessions?.length || 0,
+        processedCount: processedSessionIds?.length || 0,
+        siteStatsCount: Object.keys(existingSiteStats || {}).length
+      });
       let allSessions = [...sessions];
       if (currentSession) {
         const end = Date.now();
@@ -116,7 +128,10 @@
           categoryStats: existingCategoryStats,
           dailyTotals: {
             date: DAY_KEY(),
-            totalMinutes: Object.values(existingSiteStats).reduce((sum, s) => sum + (s.minutes || 0), 0),
+            totalMinutes: Object.values(existingSiteStats).reduce(
+              (sum, s) => sum + (s.minutes || 0),
+              0
+            ),
             totalSites: Object.keys(existingSiteStats).length,
             totalVisits: visits.length
           },
@@ -125,10 +140,15 @@
         });
         return;
       }
-      const siteStats = JSON.parse(JSON.stringify(existingSiteStats || {}));
-      const categoryStats = JSON.parse(JSON.stringify(existingCategoryStats || {}));
+      const siteStats = JSON.parse(
+        JSON.stringify(existingSiteStats || {})
+      );
+      const categoryStats = JSON.parse(
+        JSON.stringify(existingCategoryStats || {})
+      );
       let totalMinutes = 0;
       let newProcessedIds = [...processedSessionIds || []];
+      let newSessionsCount = 0;
       allSessions.forEach((s) => {
         if (newProcessedIds.includes(s.id)) {
           return;
@@ -162,7 +182,9 @@
         categoryStats[cat].minutes += minutes;
         categoryStats[cat].visits += 1;
         newProcessedIds.push(s.id);
+        newSessionsCount++;
       });
+      console.log("[histo] processed sessions:", newSessionsCount, "new processedIds count:", newProcessedIds.length);
       totalMinutes = 0;
       Object.values(siteStats).forEach((s) => {
         totalMinutes += s.minutes || 0;
@@ -213,31 +235,17 @@
         analysisState: "idle",
         lastAggregatedAt: Date.now()
       });
-      console.log("[histo] aggregateAndStore completed successfully");
+      console.log("[histo] aggregateAndStore completed successfully", {
+        totalMinutes: roundedTotalMinutes,
+        siteCount: Object.keys(siteStats).length,
+        processedIdsSaved: newProcessedIds.length
+      });
     } catch (err) {
       console.error("[histo] aggregateAndStore error:", err);
       throw err;
     }
   };
   var currentSession = null;
-  var lastAggregateTime = 0;
-  var aggregateTimer = null;
-  var scheduleAggregate = async () => {
-    const now = Date.now();
-    const timeSinceLastAggregate = now - lastAggregateTime;
-    if (aggregateTimer) clearTimeout(aggregateTimer);
-    if (timeSinceLastAggregate >= 2e3) {
-      lastAggregateTime = now;
-      await aggregateAndStore().catch(console.error);
-    } else {
-      const delayMs = 2e3 - timeSinceLastAggregate;
-      aggregateTimer = setTimeout(async () => {
-        lastAggregateTime = Date.now();
-        await aggregateAndStore().catch(console.error);
-        aggregateTimer = null;
-      }, delayMs);
-    }
-  };
   var endSession = async (reason) => {
     if (!currentSession) return;
     const end = Date.now();
@@ -245,8 +253,10 @@
     const session = { ...currentSession, end, durationMs };
     currentSession = null;
     await appendSession(session);
-    await scheduleAggregate();
     console.log("[histo] session ended", reason, session);
+    aggregateAndStore().catch((err) => {
+      console.error("[histo] delayed aggregateAndStore failed:", err);
+    });
   };
   var startSession = async (url, tabId, windowId) => {
     if (!url) return;
@@ -335,31 +345,37 @@
     }
     if (msg?.action === "get-data") {
       console.log("[histo] get-data request");
-      Promise.resolve().then(() => aggregateAndStore()).then(() => {
-        console.log("[histo] aggregation complete, fetching data");
-        return storageGet([
-          "siteStats",
-          "categoryStats",
-          "dailyTotals",
-          "dailyHistory"
-        ]);
-      }).then((data) => {
-        console.log("[histo] get-data response with data:", data);
-        try {
-          sendResponse({ ok: true, data });
-        } catch (e) {
-          console.error("[histo] sendResponse error:", e);
-        }
-      }).catch((err) => {
-        console.error("[histo] get-data error:", err);
-        try {
-          sendResponse({ ok: false, error: err?.message });
-        } catch (e) {
-          console.error("[histo] sendResponse error on catch:", e);
-        }
+      try {
+        sendResponse({ ok: true, data: null });
+        console.log("[histo] sendResponse called");
+      } catch (e) {
+        console.error("[histo] sendResponse error:", e);
+      }
+      aggregateAndStore().catch((err) => {
+        console.error("[histo] background aggregation failed:", err);
       });
-      return true;
+      return false;
     }
     return void 0;
   });
+  console.log("[histo] background script loaded");
+  chrome.alarms.create("aggregate", { periodInMinutes: 1 });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "aggregate") {
+      console.log("[histo] alarm triggered, aggregating");
+      aggregateAndStore().catch(console.error);
+    }
+  });
+  globalThis.histoDebug = {
+    testAggregate: () => aggregateAndStore(),
+    checkStorage: () => storageGet(["siteStats", "processedSessionIds", "sessions"]).then((data) => {
+      console.log("[debug] storage:", {
+        sessions: data.sessions?.length || 0,
+        processed: data.processedSessionIds?.length || 0,
+        minutes: Object.values(data.siteStats || {}).reduce((s, x) => s + (x.minutes || 0), 0)
+      });
+      return data;
+    })
+  };
+  console.log("[histo] debug functions available at window.histoDebug");
 })();

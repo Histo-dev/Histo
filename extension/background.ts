@@ -216,6 +216,12 @@ const aggregateAndStore = async () => {
       "processedSessionIds",
     ]);
 
+    console.log("[histo] loaded data:", {
+      sessionsCount: sessions?.length || 0,
+      processedCount: processedSessionIds?.length || 0,
+      siteStatsCount: Object.keys(existingSiteStats || {}).length,
+    });
+
     // Include current session in calculation but don't modify it
     let allSessions = [...sessions];
     if (currentSession) {
@@ -259,6 +265,7 @@ const aggregateAndStore = async () => {
     let newProcessedIds = [...(processedSessionIds || [])];
 
     // Only process NEW sessions
+    let newSessionsCount = 0;
     allSessions.forEach((s) => {
       if (newProcessedIds.includes(s.id)) {
         // Already processed, skip
@@ -299,8 +306,15 @@ const aggregateAndStore = async () => {
 
       // Mark this session as processed
       newProcessedIds.push(s.id);
+      newSessionsCount++;
     });
 
+    console.log(
+      "[histo] processed sessions:",
+      newSessionsCount,
+      "new processedIds count:",
+      newProcessedIds.length
+    );
     // Calculate total minutes from final siteStats (all accumulated data)
     totalMinutes = 0;
     Object.values(siteStats).forEach((s) => {
@@ -362,7 +376,11 @@ const aggregateAndStore = async () => {
       analysisState: "idle",
       lastAggregatedAt: Date.now(),
     });
-    console.log("[histo] aggregateAndStore completed successfully");
+    console.log("[histo] aggregateAndStore completed successfully", {
+      totalMinutes: roundedTotalMinutes,
+      siteCount: Object.keys(siteStats).length,
+      processedIdsSaved: newProcessedIds.length,
+    });
   } catch (err) {
     console.error("[histo] aggregateAndStore error:", err);
     throw err;
@@ -370,31 +388,6 @@ const aggregateAndStore = async () => {
 };
 
 let currentSession: Session | null = null;
-let lastAggregateTime = 0;
-let aggregateTimer: NodeJS.Timeout | null = null;
-
-// Debounced aggregation - only run once per 2 seconds at most
-const scheduleAggregate = async () => {
-  const now = Date.now();
-  const timeSinceLastAggregate = now - lastAggregateTime;
-
-  // Clear existing timer
-  if (aggregateTimer) clearTimeout(aggregateTimer);
-
-  if (timeSinceLastAggregate >= 2000) {
-    // Enough time has passed, run immediately
-    lastAggregateTime = now;
-    await aggregateAndStore().catch(console.error);
-  } else {
-    // Schedule for later to debounce rapid session switches
-    const delayMs = 2000 - timeSinceLastAggregate;
-    aggregateTimer = setTimeout(async () => {
-      lastAggregateTime = Date.now();
-      await aggregateAndStore().catch(console.error);
-      aggregateTimer = null;
-    }, delayMs);
-  }
-};
 
 const endSession = async (reason: string) => {
   if (!currentSession) return;
@@ -403,9 +396,13 @@ const endSession = async (reason: string) => {
   const session: Session = { ...currentSession, end, durationMs };
   currentSession = null;
   await appendSession(session);
-  // Schedule aggregation with debouncing
-  await scheduleAggregate();
   console.log("[histo] session ended", reason, session);
+
+  // Schedule aggregation asynchronously (don't wait for it)
+  // This prevents blocking and service worker termination
+  aggregateAndStore().catch((err) => {
+    console.error("[histo] delayed aggregateAndStore failed:", err);
+  });
 };
 
 const startSession = async (
@@ -512,36 +509,52 @@ chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
 
   if (msg?.action === "get-data") {
     console.log("[histo] get-data request");
-    // Load and return current data
-    Promise.resolve()
-      .then(() => aggregateAndStore())
-      .then(() => {
-        console.log("[histo] aggregation complete, fetching data");
-        return storageGet([
-          "siteStats",
-          "categoryStats",
-          "dailyTotals",
-          "dailyHistory",
-        ]);
-      })
-      .then((data) => {
-        console.log("[histo] get-data response with data:", data);
-        try {
-          sendResponse({ ok: true, data });
-        } catch (e) {
-          console.error("[histo] sendResponse error:", e);
-        }
-      })
-      .catch((err) => {
-        console.error("[histo] get-data error:", err);
-        try {
-          sendResponse({ ok: false, error: (err as Error)?.message });
-        } catch (e) {
-          console.error("[histo] sendResponse error on catch:", e);
-        }
-      });
-    return true;
+
+    // Immediately send response
+    try {
+      sendResponse({ ok: true, data: null });
+      console.log("[histo] sendResponse called");
+    } catch (e) {
+      console.error("[histo] sendResponse error:", e);
+    }
+
+    // Then trigger aggregation in background
+    aggregateAndStore().catch((err) => {
+      console.error("[histo] background aggregation failed:", err);
+    });
+
+    return false; // Response already sent
   }
 
   return undefined;
 });
+
+// Initialize: set up periodic aggregation
+console.log("[histo] background script loaded");
+chrome.alarms.create("aggregate", { periodInMinutes: 1 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "aggregate") {
+    console.log("[histo] alarm triggered, aggregating");
+    aggregateAndStore().catch(console.error);
+  }
+});
+
+// Expose functions for console debugging
+(globalThis as any).histoDebug = {
+  testAggregate: () => aggregateAndStore(),
+  checkStorage: () =>
+    storageGet(["siteStats", "processedSessionIds", "sessions"]).then(
+      (data) => {
+        console.log("[debug] storage:", {
+          sessions: data.sessions?.length || 0,
+          processed: data.processedSessionIds?.length || 0,
+          minutes: Object.values(data.siteStats || {}).reduce(
+            (s, x: any) => s + (x.minutes || 0),
+            0
+          ),
+        });
+        return data;
+      }
+    ),
+};
+console.log("[histo] debug functions available at window.histoDebug");
