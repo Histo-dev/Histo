@@ -4,13 +4,22 @@ import useUsageStore from "../../store/UsageContext";
 export default function DashboardColumn() {
   const { totalTimeMinutes, totalSites, siteStats, loading } = useUsageStore();
 
+  const getDisplayName = (domain: string): string => {
+    // Extension ID - show as "Histo"
+    if (domain === "ncpbnmigfbdpnpppjfefnknhbfpfjfgl") {
+      return "Histo";
+    }
+    return domain;
+  };
+
   const formatTime = (mins: number) => {
     if (mins >= 60) {
       const h = Math.floor(mins / 60);
-      const m = mins % 60;
+      const m = Math.round((mins % 60) * 10) / 10;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
-    const rounded = Math.round(mins * 10) / 10;
+    // Show 2 decimal places for precision
+    const rounded = Math.round(mins * 100) / 100;
     return `${Math.max(0, rounded)}분`;
   };
 
@@ -53,7 +62,7 @@ export default function DashboardColumn() {
         {topSites.length > 0 ? (
           topSites.map((site, idx) => (
             <li key={site.domain}>
-              <strong>#{idx + 1}</strong> {site.domain} —{" "}
+              <strong>#{idx + 1}</strong> {getDisplayName(site.domain)} —{" "}
               {formatTime(site.minutes)}
             </li>
           ))
