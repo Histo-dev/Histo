@@ -249,13 +249,19 @@
         totalMinutes += s.minutes || 0;
       });
       console.log("[histo] totalMinutes before rounding:", totalMinutes);
-      const roundedTotalMinutes = Math.round(totalMinutes * 10) / 10;
+      const roundedTotalMinutes = Math.round(totalMinutes * 100) / 100;
       Object.values(siteStats).forEach((s) => {
-        s.minutes = Math.round(s.minutes * 10) / 10;
+        s.minutes = Math.max(
+          s.minutes > 0 ? 0.01 : 0,
+          Math.round(s.minutes * 100) / 100
+        );
         s.pctOfDay = roundedTotalMinutes ? Math.round(s.minutes / roundedTotalMinutes * 1e3) / 10 : 0;
       });
       Object.values(categoryStats).forEach((c) => {
-        c.minutes = Math.round(c.minutes * 10) / 10;
+        c.minutes = Math.max(
+          c.minutes > 0 ? 0.01 : 0,
+          Math.round(c.minutes * 100) / 100
+        );
         c.sites = Object.values(siteStats).filter(
           (s) => s.category === c.name
         ).length;
