@@ -56,9 +56,13 @@
 .features {
   list-style: none;
   padding: 0;
-  margin: 14px 0 0;
+  margin: 14px;
   color: var(--muted-2);
   font-size: 13px;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 .features li {
   padding: 8px 0;
