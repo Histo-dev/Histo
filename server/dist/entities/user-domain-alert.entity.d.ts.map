@@ -1,1 +1,0 @@
-{"version":3,"file":"user-domain-alert.entity.d.ts","sourceRoot":"","sources":["../../src/entities/user-domain-alert.entity.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,IAAI,EAAE,MAAM,eAAe,CAAC;AAErC,qBACa,eAAe;IAE1B,EAAE,EAAE,MAAM,CAAC;IAGX,MAAM,EAAE,MAAM,CAAC;IAGf,IAAI,EAAE,MAAM,CAAC;IAGb,SAAS,EAAE,MAAM,CAAC;IAGlB,SAAS,EAAE,IAAI,CAAC;IAIhB,IAAI,EAAE,IAAI,CAAC;CACZ"}

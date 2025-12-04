@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
 import { User } from './user.entity';
 import { Category } from './category.entity';
 
@@ -7,18 +14,19 @@ export class UserCategory {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 255, name: 'user_id' })
+  @Column({ name: 'user_id', type: 'varchar', length: 255 })
   userId: string;
 
-  @Column({ type: 'varchar', length: 255, name: 'category_id' })
+  @Column({ name: 'category_id', type: 'varchar', length: 255 })
   categoryId: string;
 
-  @Column({ type: 'integer', name: 'alert_time' })
-  alertTime: number;
+  @Column({ name: 'alert_time', type: 'integer' })
+  alertTime: number; // 알림 시간 (분 단위)
 
-  @CreateDateColumn({ type: 'datetime', name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
+  // Relations
   @ManyToOne(() => User, (user) => user.userCategories)
   @JoinColumn({ name: 'user_id' })
   user: User;
