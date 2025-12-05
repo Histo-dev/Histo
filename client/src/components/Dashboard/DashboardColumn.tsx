@@ -18,9 +18,8 @@ export default function DashboardColumn() {
       const m = Math.round((mins % 60) * 10) / 10;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
-    // Show 2 decimal places for precision
-    const rounded = Math.round(mins * 10) / 10;
-    return `${Math.max(0, rounded)}분`;
+    // Round to 1 decimal place
+    return `${Math.max(0, Math.round(mins * 10) / 10)}분`;
   };
 
   const topSites = [...siteStats]

@@ -391,25 +391,19 @@ const aggregateAndStore = async () => {
 
     console.log("[histo] totalMinutes before rounding:", totalMinutes);
 
-    // Keep two decimal places so short sessions don't round down to zero
-    // Minimum 0.01 minutes (0.6 seconds) to ensure all sessions are counted
-    const roundedTotalMinutes = Math.round(totalMinutes * 100) / 100;
+    // Round to 1 decimal place
+    const roundedTotalMinutes = Math.round(totalMinutes * 10) / 10;
 
     Object.values(siteStats).forEach((s) => {
-      // Round to 2 decimal places, but ensure minimum 0.01 if session has any duration
-      s.minutes = Math.max(
-        s.minutes > 0 ? 0.01 : 0,
-        Math.round(s.minutes * 100) / 100
-      );
+      // Round to 1 decimal place
+      s.minutes = Math.round(s.minutes * 10) / 10;
       s.pctOfDay = roundedTotalMinutes
         ? Math.round((s.minutes / roundedTotalMinutes) * 1000) / 10
         : 0;
     });
     Object.values(categoryStats).forEach((c) => {
-      c.minutes = Math.max(
-        c.minutes > 0 ? 0.01 : 0,
-        Math.round(c.minutes * 100) / 100
-      );
+      // Round to 1 decimal place
+      c.minutes = Math.round(c.minutes * 10) / 10;
       c.sites = Object.values(siteStats).filter(
         (s) => s.category === c.name
       ).length;
