@@ -3,34 +3,42 @@ import {
   Get,
   Post,
   Body,
-  Param,
-  Delete,
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { HistoryService } from './history.service';
 import { CreateHistoryDto } from './dto/create-history.dto';
 import { BatchCreateHistoryDto } from './dto/batch-create-history.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
+import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
+import {
+  CurrentUser,
+  CurrentUserData,
+} from '../auth/decorators/current-user.decorator';
 
+@ApiTags('History')
 @Controller('history')
 export class HistoryController {
   constructor(private readonly historyService: HistoryService) {}
 
   /**
-   * 히스토리 생성 (자동 카테고리 분류)
+   * 히스토리 저장 (자동 카테고리 분류)
    */
   @Post()
+  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createHistoryDto: CreateHistoryDto) {
     return await this.historyService.create(createHistoryDto);
   }
 
   /**
-   * 여러 히스토리 일괄 생성
+   * 여러 히스토리 일괄 저장
    */
   @Post('batch')
+  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async createBatch(@Body() batchDto: BatchCreateHistoryDto) {
     return await this.historyService.createBatch(batchDto.histories);
@@ -40,82 +48,23 @@ export class HistoryController {
    * 히스토리 조회 (필터링)
    */
   @Get()
+  @UseGuards(SupabaseAuthGuard)
   async findAll(@Query() query: HistoryQueryDto) {
     return await this.historyService.findAll(query);
   }
 
   /**
-   * 특정 히스토리 조회
-   */
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return await this.historyService.findOne(id);
-  }
-
-  /**
-   * 히스토리 삭제
-   */
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.historyService.remove(id);
-  }
-
-  /**
-   * 가장 많이 방문한 사이트 Top N
-   */
-  @Get('stats/top-visited/:userId')
-  async getTopVisited(
-    @Param('userId') userId: string,
-    @Query('limit') limit?: number,
-  ) {
-    return await this.historyService.getTopVisitedSites(
-      userId,
-      limit ? parseInt(limit.toString()) : 10,
-    );
-  }
-
-  /**
-   * 가장 오래 체류한 사이트 Top N
-   */
-  @Get('stats/top-time/:userId')
-  async getTopTimeSpent(
-    @Param('userId') userId: string,
-    @Query('limit') limit?: number,
-  ) {
-    return await this.historyService.getTopTimeSpentSites(
-      userId,
-      limit ? parseInt(limit.toString()) : 10,
-    );
-  }
-
-  /**
    * 카테고리별 사용 시간 통계
    */
-  @Get('stats/category/:userId')
+  @Get('stats/category')
+  @UseGuards(SupabaseAuthGuard)
   async getCategoryStats(
-    @Param('userId') userId: string,
+    @CurrentUser() currentUser: CurrentUserData,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     return await this.historyService.getCategoryTimeStats(
-      userId,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
-    );
-  }
-
-  /**
-   * 시간대별 히스토리 개수
-   */
-  @Get('stats/hourly/:userId')
-  async getHourlyStats(
-    @Param('userId') userId: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return await this.historyService.getHourlyStats(
-      userId,
+      currentUser.id,
       startDate ? new Date(startDate) : undefined,
       endDate ? new Date(endDate) : undefined,
     );

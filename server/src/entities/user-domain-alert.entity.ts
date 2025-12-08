@@ -13,7 +13,7 @@ export class UserDomainAlert {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id', type: 'varchar', length: 255 })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
   @Column({ type: 'varchar', length: 255 })

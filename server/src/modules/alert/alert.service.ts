@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserCategory } from '../../entities/user-category.entity';
+import { UserCategoryAlert } from '../../entities/user-category-alert.entity';
 import { UserDomainAlert } from '../../entities/user-domain-alert.entity';
 import { CreateUserCategoryAlertDto } from './dto/create-user-category-alert.dto';
 import { CreateUserDomainAlertDto } from './dto/create-user-domain-alert.dto';
@@ -9,21 +9,21 @@ import { CreateUserDomainAlertDto } from './dto/create-user-domain-alert.dto';
 @Injectable()
 export class AlertService {
   constructor(
-    @InjectRepository(UserCategory)
-    private readonly userCategoryRepository: Repository<UserCategory>,
+    @InjectRepository(UserCategoryAlert)
+    private readonly userCategoryAlertRepository: Repository<UserCategoryAlert>,
     @InjectRepository(UserDomainAlert)
     private readonly userDomainAlertRepository: Repository<UserDomainAlert>,
   ) {}
 
   // ========== 카테고리 알림 ==========
 
-  async createCategoryAlert(dto: CreateUserCategoryAlertDto): Promise<UserCategory> {
-    const alert = this.userCategoryRepository.create(dto);
-    return await this.userCategoryRepository.save(alert);
+  async createCategoryAlert(dto: CreateUserCategoryAlertDto): Promise<UserCategoryAlert> {
+    const alert = this.userCategoryAlertRepository.create(dto);
+    return await this.userCategoryAlertRepository.save(alert);
   }
 
-  async getCategoryAlerts(userId: string): Promise<UserCategory[]> {
-    return await this.userCategoryRepository.find({
+  async getCategoryAlerts(userId: string): Promise<UserCategoryAlert[]> {
+    return await this.userCategoryAlertRepository.find({
       where: { userId },
       relations: ['category', 'user'],
     });
@@ -32,8 +32,8 @@ export class AlertService {
   async updateCategoryAlert(
     id: string,
     alertTime: number,
-  ): Promise<UserCategory> {
-    const alert = await this.userCategoryRepository.findOne({
+  ): Promise<UserCategoryAlert> {
+    const alert = await this.userCategoryAlertRepository.findOne({
       where: { id },
     });
 
@@ -42,11 +42,11 @@ export class AlertService {
     }
 
     alert.alertTime = alertTime;
-    return await this.userCategoryRepository.save(alert);
+    return await this.userCategoryAlertRepository.save(alert);
   }
 
   async deleteCategoryAlert(id: string): Promise<void> {
-    const alert = await this.userCategoryRepository.findOne({
+    const alert = await this.userCategoryAlertRepository.findOne({
       where: { id },
     });
 
@@ -54,7 +54,7 @@ export class AlertService {
       throw new NotFoundException(`Category alert with ID '${id}' not found`);
     }
 
-    await this.userCategoryRepository.remove(alert);
+    await this.userCategoryAlertRepository.remove(alert);
   }
 
   // ========== 도메인 알림 ==========
@@ -109,7 +109,7 @@ export class AlertService {
     categoryId: string,
     currentTime: number, // 현재 카테고리 사용 시간 (분)
   ): Promise<{ shouldAlert: boolean; alertTime: number }> {
-    const alert = await this.userCategoryRepository.findOne({
+    const alert = await this.userCategoryAlertRepository.findOne({
       where: { userId, categoryId },
     });
 

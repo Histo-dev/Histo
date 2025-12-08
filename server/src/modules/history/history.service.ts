@@ -15,7 +15,7 @@ export class HistoryService {
   ) {}
 
   /**
-   * 히스토리 생성 (자동 카테고리 분류)
+   * 히스토리 저장 (자동 카테고리 분류)
    */
   async create(createHistoryDto: CreateHistoryDto): Promise<History> {
     // ML로 카테고리 자동 분류
@@ -39,7 +39,7 @@ export class HistoryService {
   }
 
   /**
-   * 여러 히스토리 일괄 생성
+   * 여러 히스토리 일괄 저장
    */
   async createBatch(histories: CreateHistoryDto[]): Promise<History[]> {
     const results: History[] = [];
@@ -135,7 +135,7 @@ export class HistoryService {
    */
   async getTopVisitedSites(
     userId: string,
-    limit: number = 10,
+    limit: number = 3,
   ): Promise<Array<{ domain: string; count: number; totalTime: number }>> {
     const histories = await this.historyRepository.find({
       where: { userId },
@@ -174,7 +174,7 @@ export class HistoryService {
    */
   async getTopTimeSpentSites(
     userId: string,
-    limit: number = 10,
+    limit: number = 3,
   ): Promise<Array<{ domain: string; count: number; totalTime: number }>> {
     const histories = await this.historyRepository.find({
       where: { userId },
@@ -267,34 +267,5 @@ export class HistoryService {
     } catch {
       return null;
     }
-  }
-
-  /**
-   * 시간대별 히스토리 개수 (히트맵용)
-   */
-  async getHourlyStats(
-    userId: string,
-    startDate?: Date,
-    endDate?: Date,
-  ): Promise<Array<{ hour: number; count: number }>> {
-    const whereCondition: any = { userId };
-
-    if (startDate && endDate) {
-      whereCondition.visitedAt = Between(startDate, endDate);
-    }
-
-    const histories = await this.historyRepository.find({
-      where: whereCondition,
-      select: ['visitedAt'],
-    });
-
-    const hourlyStats = new Array(24).fill(0);
-
-    for (const history of histories) {
-      const hour = new Date(history.visitedAt).getHours();
-      hourlyStats[hour]++;
-    }
-
-    return hourlyStats.map((count, hour) => ({ hour, count }));
   }
 }

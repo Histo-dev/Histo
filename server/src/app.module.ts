@@ -11,6 +11,7 @@ import { UserModule } from './modules/user/user.module';
 import { AlertModule } from './modules/alert/alert.module';
 import { AdviceModule } from './modules/advice/advice.module';
 import { HealthModule } from './modules/health/health.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { HealthModule } from './modules/health/health.module';
     }),
 
     // Feature Modules
+    AuthModule,
     HealthModule,
     UserModule,
     CategoryModule,

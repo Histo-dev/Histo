@@ -16,10 +16,10 @@ export class History {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'user_id', type: 'varchar', length: 255 })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ name: 'category_id', type: 'varchar', length: 255, nullable: true })
+  @Column({ name: 'category_id', type: 'uuid', nullable: true })
   categoryId: string;
 
   @Column({ type: 'text' })
@@ -34,7 +34,7 @@ export class History {
   @Column({ name: 'use_time', type: 'integer', default: 0 })
   useTime: number; // 체류 시간 (초 단위)
 
-  @Column({ name: 'visited_at', type: 'datetime' })
+  @Column({ name: 'visited_at', type: 'timestamp' })
   visitedAt: Date;
 
   // Relations

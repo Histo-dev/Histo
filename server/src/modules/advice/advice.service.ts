@@ -136,6 +136,140 @@ export class AdviceService {
   }
 
   /**
+   * 월간 패턴 비교 및 조언 생성
+   */
+  async generateMonthlyAdvice(userId: string): Promise<AdviceMessage[]> {
+    const now = new Date();
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    // 이번 달 통계
+    const thisMonthStats = await this.historyService.getCategoryTimeStats(
+      userId,
+      oneMonthAgo,
+      now,
+    );
+
+    // 지난 달 통계
+    const lastMonthStats = await this.historyService.getCategoryTimeStats(
+      userId,
+      twoMonthsAgo,
+      oneMonthAgo,
+    );
+
+    const advice: AdviceMessage[] = [];
+
+    // 카테고리별 비교
+    for (const current of thisMonthStats) {
+      const previous = lastMonthStats.find(
+        (s) => s.categoryId === current.categoryId,
+      );
+
+      if (!previous) {
+        // 새로운 카테고리
+        advice.push({
+          type: 'new',
+          category: current.categoryName,
+          message: `📌 이번 달 새롭게 ${current.categoryName} 카테고리가 생겼습니다.`,
+          data: { time: current.totalTime, count: current.count },
+        });
+        continue;
+      }
+
+      const changePercent =
+        ((current.totalTime - previous.totalTime) / previous.totalTime) * 100;
+
+      if (changePercent > 30) {
+        // 30% 이상 증가
+        advice.push({
+          type: 'increase',
+          category: current.categoryName,
+          message: `📈 ${current.categoryName} 시간이 지난달 대비 ${changePercent.toFixed(0)}% 증가했습니다.`,
+          data: {
+            previousTime: previous.totalTime,
+            currentTime: current.totalTime,
+            change: changePercent,
+          },
+        });
+      } else if (changePercent < -30) {
+        // 30% 이상 감소
+        advice.push({
+          type: 'decrease',
+          category: current.categoryName,
+          message: `📉 ${current.categoryName} 시간이 지난달 대비 ${Math.abs(changePercent).toFixed(0)}% 감소했습니다.`,
+          data: {
+            previousTime: previous.totalTime,
+            currentTime: current.totalTime,
+            change: changePercent,
+          },
+        });
+      }
+    }
+
+    // 월간 특정 조언
+    advice.push(...this.generateMonthlySpecificAdvice(thisMonthStats));
+
+    return advice;
+  }
+
+  /**
+   * 월간 맞춤 조언
+   */
+  private generateMonthlySpecificAdvice(
+    stats: Array<{ categoryName: string; totalTime: number; count: number }>,
+  ): AdviceMessage[] {
+    const advice: AdviceMessage[] = [];
+    const totalTime = stats.reduce((sum, s) => sum + s.totalTime, 0);
+
+    for (const stat of stats) {
+      const percentage = (stat.totalTime / totalTime) * 100;
+      const hoursPerDay = stat.totalTime / 30 / 60 / 60;
+
+      // 개발 시간 지속 칭찬
+      if (stat.categoryName === '개발' && hoursPerDay > 3) {
+        advice.push({
+          type: 'praise',
+          category: stat.categoryName,
+          message: `💻 이번 달 평균 하루 ${hoursPerDay.toFixed(1)}시간 개발에 집중했습니다. 멋진 성장입니다!`,
+          data: { percentage, time: stat.totalTime, hoursPerDay },
+        });
+      }
+
+      // 학습 일관성 칭찬
+      if (stat.categoryName === '학습' && hoursPerDay > 2) {
+        advice.push({
+          type: 'praise',
+          category: stat.categoryName,
+          message: `📚 한 달간 꾸준히 학습했습니다. 평균 하루 ${hoursPerDay.toFixed(1)}시간의 학습 패턴이 유지되고 있어요!`,
+          data: { percentage, time: stat.totalTime, hoursPerDay },
+        });
+      }
+
+      // 소셜미디어 과다 경고
+      if (stat.categoryName === '소셜미디어' && percentage > 35) {
+        advice.push({
+          type: 'warning',
+          category: stat.categoryName,
+          message: `⚠️ 소셜미디어가 전체 시간의 ${percentage.toFixed(0)}%를 차지합니다. 다른 활동과 균형을 맞춰보세요.`,
+          data: { percentage, time: stat.totalTime },
+        });
+      }
+
+      // 업무 생산성 피드백
+      if (stat.categoryName === '업무' && percentage > 50) {
+        advice.push({
+          type: 'praise',
+          category: stat.categoryName,
+          message: `💼 업무에 충실한 한 달이었습니다. 생산적인 시간 관리를 하고 있어요!`,
+          data: { percentage, time: stat.totalTime },
+        });
+      }
+    }
+
+    return advice;
+  }
+
+  /**
    * 일일 요약
    */
   async generateDailySummary(userId: string): Promise<{

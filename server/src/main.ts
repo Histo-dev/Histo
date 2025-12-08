@@ -36,12 +36,12 @@ async function bootstrap() {
     .setTitle('HISTO API')
     .setDescription('히스토리 분석 및 관리 API 문서')
     .setVersion('1.0')
-    .addTag('users', '사용자 관리')
-    .addTag('categories', '카테고리 관리')
-    .addTag('history', '히스토리 관리 및 통계')
-    .addTag('ml', '머신러닝 분류')
-    .addTag('alerts', '알림 설정')
-    .addTag('advice', '조언 생성')
+    .addTag('User', '사용자 관리')
+    .addTag('Category', '카테고리 관리')
+    .addTag('History', '히스토리 관리 및 통계')
+    .addTag('Alert', '알림 설정')
+    .addTag('Advice', '조언 생성')
+    .addTag('Health', '서버 상태 확인')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -6,7 +6,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { History } from './history.entity';
-import { UserCategory } from './user-category.entity';
+import { UserCategoryAlert } from './user-category-alert.entity';
 import { UserDomainAlert } from './user-domain-alert.entity';
 
 @Entity('User')
@@ -27,8 +27,8 @@ export class User {
   @OneToMany(() => History, (history) => history.user)
   histories: History[];
 
-  @OneToMany(() => UserCategory, (userCategory) => userCategory.user)
-  userCategories: UserCategory[];
+  @OneToMany(() => UserCategoryAlert, (userCategoryAlert) => userCategoryAlert.user)
+  userCategoryAlerts: UserCategoryAlert[];
 
   @OneToMany(() => UserDomainAlert, (alert) => alert.user)
   domainAlerts: UserDomainAlert[];

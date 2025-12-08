@@ -4,46 +4,29 @@ import {
   Post,
   Body,
   Param,
-  Delete,
-  Put,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
-import { CreateCategoryDto } from './dto/create-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
+import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 
+@ApiTags('Category')
 @Controller('categories')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createCategoryDto: CreateCategoryDto) {
-    return await this.categoryService.create(createCategoryDto);
-  }
-
   @Get()
+  @UseGuards(SupabaseAuthGuard)
   async findAll(): Promise<CategoryResponseDto[]> {
     return await this.categoryService.findAll();
   }
-
+  
   @Get(':id')
+  @UseGuards(SupabaseAuthGuard)
   async findOne(@Param('id') id: string) {
     return await this.categoryService.findOne(id);
-  }
-
-  @Put(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateCategoryDto: CreateCategoryDto,
-  ) {
-    return await this.categoryService.update(id, updateCategoryDto);
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.categoryService.remove(id);
   }
 }
