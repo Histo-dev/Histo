@@ -21,33 +21,53 @@ export default function Login() {
         throw new Error("Failed to get auth token");
       }
 
-      const token = result.token;
-      console.log("Access token received:", token.substring(0, 20) + "...");
-
-      // Google API로 사용자 정보 가져오기
-      const userInfoResponse = await fetch(
-        `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`
+      const accessToken = result.token;
+      console.log(
+        "Access token received:",
+        accessToken.substring(0, 20) + "..."
       );
 
-      if (!userInfoResponse.ok) {
-        throw new Error("Failed to fetch user info");
+      // 백엔드로 accessToken 전송하여 JWT 발급받기
+      const backendUrl = "http://localhost:3000/auth/google";
+      console.log("Sending access token to backend...");
+
+      const backendResponse = await fetch(backendUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ accessToken }),
+      });
+
+      if (!backendResponse.ok) {
+        const errorData = await backendResponse.json().catch(() => ({}));
+        throw new Error(
+          `Backend authentication failed: ${
+            errorData.message || backendResponse.statusText
+          }`
+        );
       }
 
-      const userInfo = await userInfoResponse.json();
-      console.log("User info:", userInfo);
+      const backendData = await backendResponse.json();
+      console.log("Backend response received:", {
+        hasJwtToken: !!backendData.jwtToken,
+        hasUserInfo: !!backendData.userInfo,
+      });
 
-      // 로그인 정보 storage에 저장
+      // JWT 토큰과 사용자 정보를 storage에 저장
       await chrome.storage.local.set({
         isLoggedIn: true,
         loginTime: Date.now(),
-        accessToken: token,
+        jwtToken: backendData.jwtToken, // 백엔드에서 발급한 JWT
         userInfo: {
-          email: userInfo.email,
-          name: userInfo.name,
-          picture: userInfo.picture,
-          sub: userInfo.sub, // Google user ID
+          email: backendData.userInfo.email,
+          name: backendData.userInfo.name,
+          picture: backendData.userInfo.picture,
+          userId: backendData.userInfo.userId, // 백엔드 DB의 user ID
         },
       });
+
+      console.log("Login successful, redirecting to popup...");
 
       // Popup으로 리다이렉트
       window.location.href = "./popup.html";
