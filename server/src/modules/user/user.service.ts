@@ -1,49 +1,45 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { User } from '../../entities/user.entity';
-import { SupabaseService } from '../auth/supabase.service';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
 
   async findOne(id: string): Promise<User> {
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('User')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const user = await this.userRepository.findOne({ where: { id } });
 
-    if (error || !data) {
+    if (!user) {
       throw new NotFoundException(`User with ID '${id}' not found`);
     }
 
-    return data as User;
+    return user;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const { data } = await this.supabaseService
-      .getClient()
-      .from('User')
-      .select('*')
-      .eq('email', email)
-      .single();
+    return await this.userRepository.findOne({ where: { email } });
+  }
 
-    return data as User | null;
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { googleId } });
+  }
+
+  async create(userData: {
+    googleId: string;
+    email: string;
+    name: string;
+  }): Promise<User> {
+    const user = this.userRepository.create(userData);
+    return await this.userRepository.save(user);
   }
 
   async remove(id: string): Promise<void> {
     await this.findOne(id); // 존재 여부 확인
-
-    const { error } = await this.supabaseService
-      .getClient()
-      .from('User')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      throw new Error(`Failed to delete user: ${error.message}`);
-    }
+    await this.userRepository.delete(id);
   }
 
   async findOrCreate(userData: {
@@ -57,21 +53,13 @@ export class UserService {
       return { user, isNewUser: false };
     }
 
-    // 새 사용자 생성 (OneToMany 관계는 비워둠)
-    const { data, error } = await this.supabaseService
-      .getClient()
-      .from('User')
-      .insert({
-        email: userData.email,
-        name: userData.name,
-      })
-      .select()
-      .single();
+    // 새 사용자 생성
+    user = await this.create({
+      googleId: `google-${Date.now()}`, // temporary googleId for backward compatibility
+      email: userData.email,
+      name: userData.name,
+    });
 
-    if (error) {
-      throw new Error(`Failed to create user: ${error.message}`);
-    }
-
-    return { user: data as User, isNewUser: true };
+    return { user, isNewUser: true };
   }
 }

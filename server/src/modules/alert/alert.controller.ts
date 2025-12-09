@@ -9,13 +9,11 @@ import {
   Query,
   HttpCode,
   HttpStatus,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { AlertService } from './alert.service';
 import { CreateUserCategoryAlertDto } from './dto/create-user-category-alert.dto';
 import { CreateUserDomainAlertDto } from './dto/create-user-domain-alert.dto';
-import { SupabaseAuthGuard } from '../auth/guards/supabase-auth.guard';
 import {
   CurrentUser,
   CurrentUserData,
@@ -29,20 +27,17 @@ export class AlertController {
   // ========== 카테고리 알림 ==========
 
   @Post('category')
-  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async createCategoryAlert(@Body() dto: CreateUserCategoryAlertDto) {
     return await this.alertService.createCategoryAlert(dto);
   }
 
   @Get('category')
-  @UseGuards(SupabaseAuthGuard)
   async getCategoryAlerts(@CurrentUser() currentUser: CurrentUserData) {
     return await this.alertService.getCategoryAlerts(currentUser.id);
   }
 
   @Put('category/:categoryId')
-  @UseGuards(SupabaseAuthGuard)
   async updateCategoryAlert(
     @Param('categoryId') id: string,
     @Body('alertTime') alertTime: number,
@@ -51,7 +46,6 @@ export class AlertController {
   }
 
   @Delete('category/:categoryId')
-  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteCategoryAlert(@Param('categoryId') id: string) {
     await this.alertService.deleteCategoryAlert(id);
@@ -60,20 +54,17 @@ export class AlertController {
   // ========== 도메인 알림 ==========
 
   @Post('domain')
-  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async createDomainAlert(@Body() dto: CreateUserDomainAlertDto) {
     return await this.alertService.createDomainAlert(dto);
   }
 
   @Get('domain')
-  @UseGuards(SupabaseAuthGuard)
   async getDomainAlerts(@CurrentUser() currentUser: CurrentUserData) {
     return await this.alertService.getDomainAlerts(currentUser.id);
   }
 
   @Put('domain/:domainId')
-  @UseGuards(SupabaseAuthGuard)
   async updateDomainAlert(
     @Param('domainId') id: string,
     @Body('alertTime') alertTime: number,
@@ -82,7 +73,6 @@ export class AlertController {
   }
 
   @Delete('domain/:domainId')
-  @UseGuards(SupabaseAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteDomainAlert(@Param('domainId') id: string) {
     await this.alertService.deleteDomainAlert(id);
@@ -91,7 +81,6 @@ export class AlertController {
   // ========== 알림 체크 ==========
 
   @Get('check/category')
-  @UseGuards(SupabaseAuthGuard)
   async checkCategoryAlert(
     @CurrentUser() currentUser: CurrentUserData,
     @Query('categoryId') categoryId: string,
@@ -105,7 +94,6 @@ export class AlertController {
   }
 
   @Get('check/domain')
-  @UseGuards(SupabaseAuthGuard)
   async checkDomainAlert(
     @CurrentUser() currentUser: CurrentUserData,
     @Query('host') host: string,
