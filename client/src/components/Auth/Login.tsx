@@ -112,7 +112,7 @@ export default function Login() {
               />
             </svg>
           </div>
-          <h1 className={styles.title}>브라우저 활동 분석</h1>
+          <h1 className={styles.title}>HISTO</h1>
           <p className={styles.subtitle}>
             웹 사용 패턴을 분석하여 생산성을 높이세요
           </p>
@@ -152,38 +152,6 @@ export default function Login() {
             </>
           )}
         </button>
-
-        <div className={styles.features}>
-          <div className={styles.feature}>
-            <div className={styles.featureIcon}>📊</div>
-            <div className={styles.featureContent}>
-              <h3 className={styles.featureTitle}>카테고리별 분석</h3>
-              <p className={styles.featureText}>
-                소셜미디어, 개발, 뉴스 등 카테고리별 웹 사용 시간 확인
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.feature}>
-            <div className={styles.featureIcon}>🏆</div>
-            <div className={styles.featureContent}>
-              <h3 className={styles.featureTitle}>TOP 3 사이트</h3>
-              <p className={styles.featureText}>
-                가장 많이 방문한 사이트 순위와 시간 추적
-              </p>
-            </div>
-          </div>
-
-          <div className={styles.feature}>
-            <div className={styles.featureIcon}>☁️</div>
-            <div className={styles.featureContent}>
-              <h3 className={styles.featureTitle}>클라우드 동기화</h3>
-              <p className={styles.featureText}>
-                안전한 서버에 저장되어 모든 기기에서 확인 가능
-              </p>
-            </div>
-          </div>
-        </div>
 
         <p className={styles.footer}>
           로그인하면{" "}
