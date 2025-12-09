@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { HistoryService } from '../history/history.service';
+import { GeminiService } from './gemini.service';
 
 export interface AdviceMessage {
   type: 'increase' | 'decrease' | 'new' | 'warning' | 'praise';
@@ -10,12 +11,18 @@ export interface AdviceMessage {
 
 @Injectable()
 export class AdviceService {
-  constructor(private readonly historyService: HistoryService) {}
+  constructor(
+    private readonly historyService: HistoryService,
+    private readonly geminiService: GeminiService,
+  ) {}
 
   /**
    * 주간 패턴 비교 및 조언 생성
    */
-  async generateWeeklyAdvice(userId: string): Promise<AdviceMessage[]> {
+  async generateWeeklyAdvice(userId: string): Promise<{
+    advice: AdviceMessage[];
+    aiAdvice?: string;
+  }> {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -86,7 +93,31 @@ export class AdviceService {
     // 특정 카테고리별 맞춤 조언
     advice.push(...this.generateCategorySpecificAdvice(thisWeekStats));
 
-    return advice;
+    // Gemini AI 조언 생성
+    let aiAdvice: string | undefined;
+    try {
+      if (thisWeekStats.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const [dailyStats, monthlyStats] = await Promise.all([
+          this.historyService.getCategoryTimeStats(userId, today, tomorrow),
+          this.historyService.getCategoryTimeStats(userId, oneMonthAgo, now),
+        ]);
+
+        aiAdvice = await this.geminiService.generateAdvice({
+          dailyStats,
+          weeklyStats: thisWeekStats,
+          monthlyStats,
+        });
+      }
+    } catch (error) {
+      console.error('AI 조언 생성 실패:', error);
+    }
+
+    return { advice, aiAdvice };
   }
 
   /**
@@ -138,7 +169,10 @@ export class AdviceService {
   /**
    * 월간 패턴 비교 및 조언 생성
    */
-  async generateMonthlyAdvice(userId: string): Promise<AdviceMessage[]> {
+  async generateMonthlyAdvice(userId: string): Promise<{
+    advice: AdviceMessage[];
+    aiAdvice?: string;
+  }> {
     const now = new Date();
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
@@ -209,7 +243,31 @@ export class AdviceService {
     // 월간 특정 조언
     advice.push(...this.generateMonthlySpecificAdvice(thisMonthStats));
 
-    return advice;
+    // Gemini AI 조언 생성
+    let aiAdvice: string | undefined;
+    try {
+      if (thisMonthStats.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        const [dailyStats, weeklyStats] = await Promise.all([
+          this.historyService.getCategoryTimeStats(userId, today, tomorrow),
+          this.historyService.getCategoryTimeStats(userId, oneWeekAgo, now),
+        ]);
+
+        aiAdvice = await this.geminiService.generateAdvice({
+          dailyStats,
+          weeklyStats,
+          monthlyStats: thisMonthStats,
+        });
+      }
+    } catch (error) {
+      console.error('AI 조언 생성 실패:', error);
+    }
+
+    return { advice, aiAdvice };
   }
 
   /**
@@ -277,6 +335,7 @@ export class AdviceService {
     topCategory: string;
     topDomain: string;
     advice: string[];
+    aiAdvice?: string;
   }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -304,11 +363,107 @@ export class AdviceService {
       advice.push(`오늘은 주로 ${topCategory.categoryName} 활동을 했습니다.`);
     }
 
+    // Gemini AI 조언 생성
+    let aiAdvice: string | undefined;
+    try {
+      if (categoryStats.length > 0) {
+        const now = new Date();
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const [weeklyStats, monthlyStats] = await Promise.all([
+          this.historyService.getCategoryTimeStats(userId, oneWeekAgo, now),
+          this.historyService.getCategoryTimeStats(userId, oneMonthAgo, now),
+        ]);
+
+        aiAdvice = await this.geminiService.generateAdvice({
+          dailyStats: categoryStats,
+          weeklyStats,
+          monthlyStats,
+        });
+      }
+    } catch (error) {
+      console.error('AI 조언 생성 실패:', error);
+    }
+
     return {
       totalTime,
       topCategory: topCategory?.categoryName || '없음',
       topDomain: topSites[0]?.domain || '없음',
       advice,
+      aiAdvice,
     };
+  }
+
+  /**
+   * GPT 기반 개인화된 조언 생성
+   */
+  async generateGPTAdvice(userId: string): Promise<string> {
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+    const [dailyStats, weeklyStats, monthlyStats] = await Promise.all([
+      this.historyService.getCategoryTimeStats(userId, today, tomorrow),
+      this.historyService.getCategoryTimeStats(userId, oneWeekAgo, now),
+      this.historyService.getCategoryTimeStats(userId, oneMonthAgo, now),
+    ]);
+
+    return await this.geminiService.generateAdvice({
+      dailyStats,
+      weeklyStats,
+      monthlyStats,
+    });
+  }
+
+  /**
+   * 특정 카테고리에 대한 GPT 조언 생성
+   */
+  async generateGPTCategoryAdvice(
+    userId: string,
+    categoryName: string,
+  ): Promise<string> {
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    const [thisWeekStats, lastWeekStats] = await Promise.all([
+      this.historyService.getCategoryTimeStats(userId, oneWeekAgo, now),
+      this.historyService.getCategoryTimeStats(userId, twoWeeksAgo, oneWeekAgo),
+    ]);
+
+    const currentCategoryStats = thisWeekStats.find(
+      (s) => s.categoryName === categoryName,
+    );
+    const previousCategoryStats = lastWeekStats.find(
+      (s) => s.categoryName === categoryName,
+    );
+
+    if (!currentCategoryStats) {
+      throw new Error(`${categoryName} 카테고리의 데이터를 찾을 수 없습니다.`);
+    }
+
+    const totalTime = thisWeekStats.reduce((sum, s) => sum + s.totalTime, 0);
+    const percentage = (currentCategoryStats.totalTime / totalTime) * 100;
+
+    let trend: 'increase' | 'decrease' | 'stable' = 'stable';
+    if (previousCategoryStats) {
+      const changePercent =
+        ((currentCategoryStats.totalTime - previousCategoryStats.totalTime) /
+          previousCategoryStats.totalTime) *
+        100;
+      if (changePercent > 10) trend = 'increase';
+      else if (changePercent < -10) trend = 'decrease';
+    }
+
+    return await this.geminiService.generateCategoryAdvice(categoryName, {
+      totalTime: currentCategoryStats.totalTime,
+      count: currentCategoryStats.count,
+      trend,
+      percentage,
+    });
   }
 }

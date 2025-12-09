@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { HistoryService } from './history.service';
-import { CreateHistoryDto } from './dto/create-history.dto';
 import { BatchCreateHistoryDto } from './dto/batch-create-history.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
 import {
@@ -27,8 +26,10 @@ export class HistoryController {
    */
   @Post('batch')
   @HttpCode(HttpStatus.CREATED)
-  async createBatch(@Body() batchDto: BatchCreateHistoryDto) {
-    return await this.historyService.createBatch(batchDto.histories);
+  async createBatch(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Body() batchDto: BatchCreateHistoryDto) {
+    return await this.historyService.createBatch(batchDto.histories, currentUser.id);
   }
 
   /**
