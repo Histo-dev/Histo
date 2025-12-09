@@ -7,25 +7,73 @@ export default function Login() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      // TODO: Google OAuth 로그인 구현
-      console.log("Google login clicked");
+      // Chrome Identity API로 Google OAuth 토큰 발급
+      console.log("Requesting Google auth token...");
 
-      // 임시: 로그인 성공 시뮬레이션 (1초 후)
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // 로그인 성공 표시를 storage에 저장
-      if (typeof chrome !== "undefined" && chrome.storage) {
-        await chrome.storage.local.set({
-          isLoggedIn: true,
-          loginTime: Date.now(),
-        });
+      if (typeof chrome === "undefined" || !chrome.identity) {
+        throw new Error("Chrome Identity API not available");
       }
 
-      // Popup 환경에서는 popup.html로 리다이렉트
+      // interactive: true - 사용자에게 로그인 팝업 표시
+      const result = await chrome.identity.getAuthToken({ interactive: true });
+
+      if (!result || !result.token) {
+        throw new Error("Failed to get auth token");
+      }
+
+      const token = result.token;
+      console.log("Access token received:", token.substring(0, 20) + "...");
+
+      // Google API로 사용자 정보 가져오기
+      const userInfoResponse = await fetch(
+        `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`
+      );
+
+      if (!userInfoResponse.ok) {
+        throw new Error("Failed to fetch user info");
+      }
+
+      const userInfo = await userInfoResponse.json();
+      console.log("User info:", userInfo);
+
+      // 로그인 정보 storage에 저장
+      await chrome.storage.local.set({
+        isLoggedIn: true,
+        loginTime: Date.now(),
+        accessToken: token,
+        userInfo: {
+          email: userInfo.email,
+          name: userInfo.name,
+          picture: userInfo.picture,
+          sub: userInfo.sub, // Google user ID
+        },
+      });
+
+      // Popup으로 리다이렉트
       window.location.href = "./popup.html";
     } catch (error) {
       console.error("Login failed:", error);
-      alert("로그인에 실패했습니다. 다시 시도해주세요.");
+
+      // 토큰 캐시 제거 후 재시도
+      if (chrome.identity) {
+        try {
+          const cachedResult = await chrome.identity.getAuthToken({
+            interactive: false,
+          });
+          if (cachedResult?.token) {
+            await chrome.identity.removeCachedAuthToken({
+              token: cachedResult.token,
+            });
+          }
+        } catch (e) {
+          console.error("Failed to clear cached token:", e);
+        }
+      }
+
+      alert(
+        "로그인에 실패했습니다. \n" +
+          (error instanceof Error ? error.message : "다시 시도해주세요.")
+      );
     } finally {
       setIsLoading(false);
     }
