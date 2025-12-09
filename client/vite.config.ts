@@ -11,6 +11,7 @@ export default defineConfig({
         main: "index.html",
         popup: "popup.html",
         options: "options.html",
+        login: "login.html",
       },
     },
   },

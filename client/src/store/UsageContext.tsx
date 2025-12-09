@@ -111,7 +111,13 @@ const convertStorageToState = (storage: Record<string, any>): UsageState => {
   };
 };
 
-export const UsageProvider = ({ children }: { children: ReactNode }) => {
+export const UsageProvider = ({
+  children,
+  triggerRefresh = 0,
+}: {
+  children: ReactNode;
+  triggerRefresh?: number;
+}) => {
   const [state, setState] = useState<UsageState>(defaultState);
 
   useEffect(() => {
@@ -122,40 +128,8 @@ export const UsageProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        // Request background to aggregate and provide latest data
-        const response = await new Promise<any>((resolve) => {
-          const timeout = setTimeout(() => {
-            console.warn("get-data timeout, falling back to storage");
-            resolve(null);
-          }, 1000);
-
-          chrome.runtime.sendMessage({ action: "get-data" }, (response) => {
-            clearTimeout(timeout);
-            if (chrome.runtime.lastError) {
-              console.warn(
-                "Failed to get data from background:",
-                chrome.runtime.lastError
-              );
-              resolve(null);
-            } else {
-              resolve(response);
-            }
-          });
-        });
-
-        if (response?.ok && response?.data) {
-          console.log("[histo] got data from background:", response.data);
-          setState(convertStorageToState(response.data));
-          return;
-        }
-
-        // Fallback to local storage
-        if (!chrome.storage) {
-          setState(demoState);
-          return;
-        }
-
-        const result = await new Promise<any>((resolve) => {
+        // First, try to load from local storage immediately
+        const storageData = await new Promise<any>((resolve) => {
           chrome.storage.local.get(
             [
               "siteStats",
@@ -170,15 +144,46 @@ export const UsageProvider = ({ children }: { children: ReactNode }) => {
           );
         });
 
-        console.log("[histo] loaded from storage:", result);
+        console.log("[histo] loaded from storage:", storageData);
 
-        // Use actual data if it exists, otherwise use demo
-        const siteStats = result?.siteStats ?? {};
-        const totalMinutes = result?.dailyTotals?.totalMinutes ?? 0;
+        // Then, request background to aggregate and update data
+        // Note: This may fail if background worker isn't ready, but that's okay - we use storage data
+        if (chrome.runtime?.sendMessage) {
+          const response = await new Promise<any>((resolve) => {
+            const timeout = setTimeout(() => {
+              resolve(null);
+            }, 2000);
+
+            try {
+              chrome.runtime.sendMessage({ action: "get-data" }, (response) => {
+                clearTimeout(timeout);
+                if (chrome.runtime.lastError) {
+                  // Silently ignore - storage data is sufficient
+                  resolve(null);
+                } else {
+                  resolve(response);
+                }
+              });
+            } catch (err) {
+              clearTimeout(timeout);
+              resolve(null);
+            }
+          });
+
+          if (response?.ok && response?.data) {
+            console.log("[histo] got data from background:", response.data);
+            setState(convertStorageToState(response.data));
+            return;
+          }
+        }
+
+        // Use storage data if background response failed
+        const siteStats = storageData?.siteStats ?? {};
+        const totalMinutes = storageData?.dailyTotals?.totalMinutes ?? 0;
         const hasSiteStats = Object.keys(siteStats).length > 0;
 
         if (hasSiteStats || totalMinutes > 0) {
-          setState(convertStorageToState(result));
+          setState(convertStorageToState(storageData));
         } else {
           // Only use demo if no actual data at all
           setState(demoState);
@@ -190,7 +195,7 @@ export const UsageProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadData();
-  }, []);
+  }, [triggerRefresh]);
 
   return (
     <UsageContext.Provider value={state}>{children}</UsageContext.Provider>

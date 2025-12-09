@@ -10,10 +10,11 @@ export default function Detail() {
   const formatTime = (mins: number) => {
     if (mins >= 60) {
       const h = Math.floor(mins / 60);
-      const m = mins % 60;
+      const m = Math.round((mins % 60) * 10) / 10;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
-    return `${Math.max(0, Math.round(mins))}분`;
+    // Round to 1 decimal place
+    return `${Math.max(0, Math.round(mins * 10) / 10)}분`;
   };
 
   const openDomain = (domain: string) => {
@@ -22,7 +23,10 @@ export default function Detail() {
   };
 
   const sites = useMemo(
-    () => [...siteStats].sort((a, b) => b.minutes - a.minutes).slice(0, 10),
+    () =>
+      [...siteStats]
+        .sort((a, b) => (b.lastVisited || 0) - (a.lastVisited || 0))
+        .slice(0, 10),
     [siteStats]
   );
 
@@ -44,6 +48,7 @@ export default function Detail() {
               100
             ).toFixed(1)}
             onOpen={openDomain}
+            showDomain={true}
           />
         ))}
       </div>

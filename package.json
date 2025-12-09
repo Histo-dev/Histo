@@ -5,6 +5,7 @@
   "scripts": {
     "build:client": "pnpm --prefix client build",
     "build:background": "node scripts/build-background.js",
+    "build:client:only": "pnpm run build:client && xcopy /e /i /y client\\dist extension\\dist && node scripts/fix-extension-html.js",
     "build:extension": "pnpm run build:client && rm -rf extension/dist && cp -r client/dist extension/dist && pnpm run build:background",
     "build:extension:window": "pnpm run build:client && rmdir /s /q extension\\dist 2>nul & xcopy /e /i /y client\\dist extension\\dist && node scripts/fix-extension-html.js && pnpm run build:background"
   },
