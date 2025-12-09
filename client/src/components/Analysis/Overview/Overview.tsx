@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import CategoryTime, { type ICategory } from "./CategoryTime";
 import styles from "./Overview.module.css";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
@@ -14,6 +15,7 @@ const palette = [
 ];
 
 export default function Overview() {
+  const navigate = useNavigate();
   const state = useUsageStore();
   const { categoryStats, totalTimeMinutes, loading } = state;
 
@@ -85,6 +87,15 @@ export default function Overview() {
             <Tooltip formatter={(value: any) => `${formatMinutes(value)}`} />
           </PieChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className={styles.buttonSection}>
+        <button
+          className={styles.detailButton}
+          onClick={() => navigate("/analysis/detail")}
+        >
+          상세 분석 보기
+        </button>
       </div>
     </>
   );

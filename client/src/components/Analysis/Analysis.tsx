@@ -18,6 +18,17 @@ export default function Analysis({ onBack }: Props) {
 
   const changeTab = (t: TabKey) => navigate(`/analysis/${t}`);
 
+  // Detail 페이지는 전체 화면으로 렌더링
+  const isDetailPage = currentTab === "detail";
+
+  if (isDetailPage) {
+    return (
+      <Routes>
+        <Route path="detail" element={<Detail />} />
+      </Routes>
+    );
+  }
+
   return (
     <div className={styles.shell}>
       <Header
@@ -35,7 +46,6 @@ export default function Analysis({ onBack }: Props) {
       <Routes>
         <Route path="overview" element={<Overview />} />
         <Route path="topN" element={<TopN />} />
-        <Route path="detail" element={<Detail />} />
       </Routes>
     </div>
   );
