@@ -1,18 +1,21 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { SupabaseAuthGuard } from './guards/supabase-auth.guard';
-import { SupabaseService } from './supabase.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, UserModule],
+  controllers: [AuthController],
   providers: [
-    SupabaseService,
+    AuthService,
     {
       provide: APP_GUARD,
-      useClass: SupabaseAuthGuard,
+      useClass: JwtAuthGuard,
     },
   ],
-  exports: [SupabaseService],
+  exports: [AuthService],
 })
 export class AuthModule {}

@@ -30,10 +30,10 @@ class EnvironmentVariables {
   DB_PASSWORD: string;
 
   @IsString()
-  SUPABASE_URL: string;
+  JWT_SECRET: string;
 
   @IsString()
-  SUPABASE_KEY: string;
+  JWT_EXPIRES_IN: string;
 }
 
 export function validate(config: Record<string, unknown>) {

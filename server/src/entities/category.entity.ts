@@ -19,7 +19,7 @@ export class Category {
   @Column({ type: 'text', nullable: true })
   embedding: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int', nullable: true })
   dimension: number;
 
   // Relations
