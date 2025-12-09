@@ -23,15 +23,6 @@ export class HistoryController {
   constructor(private readonly historyService: HistoryService) {}
 
   /**
-   * 히스토리 저장 (자동 카테고리 분류)
-   */
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createHistoryDto: CreateHistoryDto) {
-    return await this.historyService.create(createHistoryDto);
-  }
-
-  /**
    * 여러 히스토리 일괄 저장
    */
   @Post('batch')

@@ -32,15 +32,4 @@ export class UserController {
       user,
     };
   }
-
-  @Get('me')
-  async getMe(@CurrentUser() currentUser: CurrentUserData) {
-    return await this.userService.findByEmail(currentUser.email);
-  }
-
-  @Delete('leave')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@CurrentUser() currentUser: CurrentUserData) {
-    await this.userService.remove(currentUser.id);
-  }
 }
