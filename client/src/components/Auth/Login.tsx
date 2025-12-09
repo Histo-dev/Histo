@@ -28,7 +28,7 @@ export default function Login() {
       );
 
       // 백엔드로 accessToken 전송하여 JWT 발급받기
-      const backendUrl = "http://localhost:3000/auth/google";
+      const backendUrl = "http://localhost:3000/auth/google/login";
       console.log("Sending access token to backend...");
 
       const backendResponse = await fetch(backendUrl, {
@@ -49,21 +49,21 @@ export default function Login() {
       }
 
       const backendData = await backendResponse.json();
-      console.log("Backend response received:", {
-        hasJwtToken: !!backendData.jwtToken,
-        hasUserInfo: !!backendData.userInfo,
-      });
+      console.log("Backend response:", backendData);
+
+      if (!backendData || !backendData.user) {
+        throw new Error("Invalid backend response format");
+      }
 
       // JWT 토큰과 사용자 정보를 storage에 저장
       await chrome.storage.local.set({
         isLoggedIn: true,
         loginTime: Date.now(),
-        jwtToken: backendData.jwtToken, // 백엔드에서 발급한 JWT
-        userInfo: {
-          email: backendData.userInfo.email,
-          name: backendData.userInfo.name,
-          picture: backendData.userInfo.picture,
-          userId: backendData.userInfo.userId, // 백엔드 DB의 user ID
+        jwtToken: backendData.accessToken, // 백엔드에서 발급한 JWT
+        user: {
+          userId: backendData.user.userId, // 백엔드 DB의 user ID
+          email: backendData.user.email,
+          name: backendData.user.name,
         },
       });
 
