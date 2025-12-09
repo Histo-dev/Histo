@@ -17,19 +17,17 @@ export class HistoryService {
   /**
    * 히스토리 저장 (자동 카테고리 분류)
    */
-  async create(createHistoryDto: CreateHistoryDto): Promise<History> {
+  async create(createHistoryDto: CreateHistoryDto, userId: string): Promise<History> {
     // ML로 카테고리 자동 분류
     const classification = await this.classificationService.classifyPage({
       url: createHistoryDto.url,
       title: createHistoryDto.title,
-      meta: createHistoryDto.meta,
     });
 
     const history = this.historyRepository.create({
-      userId: createHistoryDto.userId,
+      userId: userId,
       url: createHistoryDto.url,
       title: createHistoryDto.title,
-      meta: createHistoryDto.meta,
       useTime: createHistoryDto.useTime || 0,
       categoryId: classification.categoryId,
       visitedAt: new Date(),
@@ -41,12 +39,12 @@ export class HistoryService {
   /**
    * 여러 히스토리 일괄 저장
    */
-  async createBatch(histories: CreateHistoryDto[]): Promise<History[]> {
+  async createBatch(histories: CreateHistoryDto[], userId: string): Promise<History[]> {
     const results: History[] = [];
 
     for (const historyDto of histories) {
       try {
-        const history = await this.create(historyDto);
+        const history = await this.create(historyDto, userId);
         results.push(history);
       } catch (error) {
         console.error(`Failed to create history for ${historyDto.url}:`, error);

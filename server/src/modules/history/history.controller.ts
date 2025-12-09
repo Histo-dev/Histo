@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { HistoryService } from './history.service';
-import { CreateHistoryDto } from './dto/create-history.dto';
 import { BatchCreateHistoryDto } from './dto/batch-create-history.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
 import {
@@ -23,21 +22,14 @@ export class HistoryController {
   constructor(private readonly historyService: HistoryService) {}
 
   /**
-   * 히스토리 저장 (자동 카테고리 분류)
-   */
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createHistoryDto: CreateHistoryDto) {
-    return await this.historyService.create(createHistoryDto);
-  }
-
-  /**
    * 여러 히스토리 일괄 저장
    */
   @Post('batch')
   @HttpCode(HttpStatus.CREATED)
-  async createBatch(@Body() batchDto: BatchCreateHistoryDto) {
-    return await this.historyService.createBatch(batchDto.histories);
+  async createBatch(
+    @CurrentUser() currentUser: CurrentUserData,
+    @Body() batchDto: BatchCreateHistoryDto) {
+    return await this.historyService.createBatch(batchDto.histories, currentUser.id);
   }
 
   /**

@@ -51,7 +51,7 @@ export class AuthController {
 
     // 3. JWT 토큰 생성
     const jwtToken = this.authService.generateJwtToken({
-      userId: user.googleId,
+      userId: user.id,
       email: user.email,
       name: user.name,
     });
@@ -60,7 +60,7 @@ export class AuthController {
     return {
       accessToken: jwtToken,
       user: {
-        userId: user.googleId,
+        userId: user.id,
         email: user.email,
         name: user.name,
       },
