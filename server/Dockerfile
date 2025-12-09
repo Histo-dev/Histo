@@ -1,54 +1,41 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-# pnpm 설치
+FROM node:20-alpine AS base
 RUN npm install -g pnpm@10.6.4
-
-# 작업 디렉토리 설정
 WORKDIR /app
 
-# Python과 build dependencies 설치 (tensorflow 빌드를 위해)
+# === Dependencies 단계 ===
+FROM base AS dependencies
 RUN apk add --no-cache python3 make g++
-
-# package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml ./
+RUN pnpm config set network-timeout 300000 && \
+    pnpm install --frozen-lockfile
 
-# 의존성 설치
-RUN pnpm install --frozen-lockfile
+# tfjs-node 네이티브 모듈 rebuild
+RUN pnpm rebuild @tensorflow/tfjs-node --build-addon-from-source
 
-# 소스 코드 복사
+# === Builder 단계 ===
+FROM dependencies AS builder
 COPY . .
-
-# TypeScript 빌드
 RUN pnpm run build
 
-# Production stage
-FROM node:20-alpine AS production
-
-# pnpm 설치
-RUN npm install -g pnpm@10.6.4
-
-# 작업 디렉토리 설정
-WORKDIR /app
-
-# Python과 runtime dependencies 설치 (tensorflow runtime을 위해)
+# === Production Dependencies ===
+FROM base AS prod-deps
+# ⭐ 여기가 중요! g++이 필요함
 RUN apk add --no-cache python3 make g++
-
-# package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml ./
+RUN pnpm config set network-timeout 300000 && \
+    pnpm install --frozen-lockfile --prod
 
-# 프로덕션 의존성만 설치
-RUN pnpm install --frozen-lockfile --prod
+# tfjs-node 네이티브 모듈 rebuild (프로덕션에서도!)
+RUN pnpm rebuild @tensorflow/tfjs-node --build-addon-from-source
 
-# 빌드된 파일 복사
+# === Production 이미지 ===
+FROM base AS production
+# ⭐ 런타임에도 필요한 라이브러리 설치
+RUN apk add --no-cache libstdc++ libgomp
+
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY package.json ./
 
-# 포트 노출
 EXPOSE 3000
-
-# 헬스체크
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# 프로덕션 모드로 실행
-CMD ["pnpm", "run", "start:prod"]
+CMD ["node", "dist/main"]

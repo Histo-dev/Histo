@@ -5,27 +5,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ConfigService } from '@nestjs/config';
+import { AuthService } from '../auth.service';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
-export class SupabaseAuthGuard implements CanActivate {
-  private supabase: SupabaseClient;
-
+export class JwtAuthGuard implements CanActivate {
   constructor(
-    private configService: ConfigService,
+    private authService: AuthService,
     private reflector: Reflector,
-  ) {
-    const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
-    const supabaseKey = this.configService.get<string>('SUPABASE_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase configuration is missing');
-    }
-
-    this.supabase = createClient(supabaseUrl, supabaseKey);
-  }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // @Public() 데코레이터가 적용된 경우 인증 스킵
@@ -52,26 +40,19 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     try {
-      // Supabase JWT 검증
-      const {
-        data: { user },
-        error,
-      } = await this.supabase.auth.getUser(token);
-
-      if (error || !user) {
-        throw new UnauthorizedException('Invalid token');
-      }
+      // JWT 토큰 검증
+      const payload = this.authService.verifyJwtToken(token);
 
       // 검증된 사용자 정보를 request에 추가
       request.user = {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata?.name || user.user_metadata?.full_name || '',
+        id: payload.userId,
+        email: payload.email,
+        name: payload.name,
       };
 
       return true;
     } catch (error) {
-      throw new UnauthorizedException('Authentication failed');
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 }

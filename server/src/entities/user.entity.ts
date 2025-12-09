@@ -20,6 +20,9 @@ export class User {
   @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
+  @Column({ type: 'varchar', length: 255, unique: true })
+  googleId: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
