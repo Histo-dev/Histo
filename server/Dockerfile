@@ -1,5 +1,5 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Build and production stage
+FROM node:20-alpine
 
 # pnpm 설치
 RUN npm install -g pnpm@10.6.4
@@ -21,27 +21,6 @@ COPY . .
 
 # TypeScript 빌드
 RUN pnpm run build
-
-# Production stage
-FROM node:20-alpine AS production
-
-# pnpm 설치
-RUN npm install -g pnpm@10.6.4
-
-# 작업 디렉토리 설정
-WORKDIR /app
-
-# Python과 runtime dependencies 설치 (tensorflow runtime을 위해)
-RUN apk add --no-cache python3 make g++
-
-# package.json과 pnpm-lock.yaml 복사
-COPY package.json pnpm-lock.yaml ./
-
-# 프로덕션 의존성만 설치
-RUN pnpm install --frozen-lockfile --prod
-
-# 빌드된 파일 복사
-COPY --from=builder /app/dist ./dist
 
 # 포트 노출
 EXPOSE 3000
