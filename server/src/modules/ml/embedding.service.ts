@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import '@tensorflow/tfjs-node'; // Node.js 백엔드 등록
+import '@tensorflow/tfjs-backend-cpu';
 import * as tf from '@tensorflow/tfjs';
 import * as use from '@tensorflow-models/universal-sentence-encoder';
 

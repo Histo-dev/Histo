@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "lldb",
+      "request": "launch",
+      "args": [],
+      "cwd": "/Users/yuna/Projects/Histo/server/node_modules/@tensorflow/tfjs-node/binding",
+      "program": "/Users/yuna/Projects/Histo/server/node_modules/@tensorflow/tfjs-node/binding/build/Debug/outDebug"
+    }
+  ]
+}
