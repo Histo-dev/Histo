@@ -55,6 +55,8 @@ const MAX_VISITS = 1000;
 const MAX_SESSIONS = 500;
 const DAY_KEY = () => new Date().toISOString().slice(0, 10);
 const CURRENT_SESSION_KEY = "currentSession";
+const BACKEND_URL = "http://localhost:3000"; // 백엔드 서버 URL
+const SYNC_INTERVAL_MINUTES = 5; // 5분마다 동기화
 
 const randomId = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -145,6 +147,11 @@ const checkAndResetIfNewDay = async () => {
       await archiveDailyData(dailyTotals);
     }
 
+    // 🆕 Sync to backend before reset
+    await syncToBackend().catch((err) => 
+      console.error("[histo] failed to sync before daily reset:", err)
+    );
+
     // Reset current data
     await storageSet({
       sessions: [],
@@ -160,6 +167,7 @@ const checkAndResetIfNewDay = async () => {
         totalVisits: 0,
       },
       lastDate: currentDate,
+      lastSyncedAt: null, // Reset sync timestamp
     });
     currentSession = null;
     console.log("[histo] new day detected, data reset");
@@ -168,6 +176,66 @@ const checkAndResetIfNewDay = async () => {
   // Update lastDate if not set
   if (!lastDate) {
     await storageSet({ lastDate: currentDate });
+  }
+};
+
+// 🆕 Sync history data to backend
+const syncToBackend = async () => {
+  try {
+    // Get JWT token
+    const { jwtToken } = await storageGet<{ jwtToken?: string }>(["jwtToken"]);
+    if (!jwtToken) {
+      console.log("[histo] skip sync: not logged in");
+      return;
+    }
+
+    // Get sessions to upload
+    const { sessions = [], lastSyncedAt } = await storageGet<{
+      sessions?: Session[];
+      lastSyncedAt?: number;
+    }>(["sessions", "lastSyncedAt"]);
+
+    // Filter sessions created after last sync
+    const unsyncedSessions = sessions.filter(
+      (s) => s.end && s.url && s.url.startsWith('http') && (!lastSyncedAt || s.start > lastSyncedAt)
+    );
+
+    if (unsyncedSessions.length === 0) {
+      console.log("[histo] no new sessions to sync");
+      return;
+    }
+
+    // Convert sessions to backend format
+    const histories = unsyncedSessions.map((session) => ({
+      url: session.url,
+      title: session.domain || new URL(session.url).hostname, // Use domain or extract from URL
+      useTime: session.durationMs ? Math.round(session.durationMs / 1000) : 0, // Convert to seconds
+    }));
+
+    console.log(`[histo] syncing ${histories.length} sessions to backend...`);
+
+    // Send to backend
+    const response = await fetch(`${BACKEND_URL}/history/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${jwtToken}`,
+      },
+      body: JSON.stringify({ histories }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+
+    const result = await response.json();
+    console.log("[histo] sync successful:", result);
+
+    // Update last synced timestamp
+    await storageSet({ lastSyncedAt: Date.now() });
+  } catch (error) {
+    console.error("[histo] sync failed:", error);
+    throw error;
   }
 };
 
@@ -608,13 +676,18 @@ chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
   return undefined;
 });
 
-// Initialize: set up periodic aggregation
+// Initialize: set up periodic aggregation and sync
 console.log("[histo] background script loaded");
 chrome.alarms.create("aggregate", { periodInMinutes: 1 });
+chrome.alarms.create("syncToBackend", { periodInMinutes: SYNC_INTERVAL_MINUTES });
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "aggregate") {
     console.log("[histo] alarm triggered, aggregating");
     aggregateAndStore().catch(console.error);
+  } else if (alarm.name === "syncToBackend") {
+    console.log("[histo] sync alarm triggered");
+    syncToBackend().catch(console.error);
   }
 });
 
@@ -631,8 +704,9 @@ loadPersistedCurrentSession()
 // Expose functions for console debugging
 (globalThis as any).histoDebug = {
   testAggregate: () => aggregateAndStore(),
+  testSync: () => syncToBackend(), // 🆕 Test sync function
   checkStorage: () =>
-    storageGet(["siteStats", "processedSessionIds", "sessions"]).then(
+    storageGet(["siteStats", "processedSessionIds", "sessions", "lastSyncedAt"]).then(
       (data) => {
         console.log("[debug] storage:", {
           sessions: data.sessions?.length || 0,
@@ -641,6 +715,7 @@ loadPersistedCurrentSession()
             (s, x: any) => s + (x.minutes || 0),
             0
           ),
+          lastSynced: data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : "never",
         });
         return data;
       }
