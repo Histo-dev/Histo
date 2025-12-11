@@ -148,7 +148,7 @@ const checkAndResetIfNewDay = async () => {
     }
 
     // 🆕 Sync to backend before reset
-    await syncToBackend().catch((err) => 
+    await syncToBackend().catch((err) =>
       console.error("[histo] failed to sync before daily reset:", err)
     );
 
@@ -197,7 +197,11 @@ const syncToBackend = async () => {
 
     // Filter sessions created after last sync
     const unsyncedSessions = sessions.filter(
-      (s) => s.end && s.url && s.url.startsWith('http') && (!lastSyncedAt || s.start > lastSyncedAt)
+      (s) =>
+        s.end &&
+        s.url &&
+        s.url.startsWith("http") &&
+        (!lastSyncedAt || s.start > lastSyncedAt)
     );
 
     if (unsyncedSessions.length === 0) {
@@ -679,7 +683,9 @@ chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
 // Initialize: set up periodic aggregation and sync
 console.log("[histo] background script loaded");
 chrome.alarms.create("aggregate", { periodInMinutes: 1 });
-chrome.alarms.create("syncToBackend", { periodInMinutes: SYNC_INTERVAL_MINUTES });
+chrome.alarms.create("syncToBackend", {
+  periodInMinutes: SYNC_INTERVAL_MINUTES,
+});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "aggregate") {
@@ -706,19 +712,24 @@ loadPersistedCurrentSession()
   testAggregate: () => aggregateAndStore(),
   testSync: () => syncToBackend(), // 🆕 Test sync function
   checkStorage: () =>
-    storageGet(["siteStats", "processedSessionIds", "sessions", "lastSyncedAt"]).then(
-      (data) => {
-        console.log("[debug] storage:", {
-          sessions: data.sessions?.length || 0,
-          processed: data.processedSessionIds?.length || 0,
-          minutes: Object.values(data.siteStats || {}).reduce(
-            (s, x: any) => s + (x.minutes || 0),
-            0
-          ),
-          lastSynced: data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : "never",
-        });
-        return data;
-      }
-    ),
+    storageGet([
+      "siteStats",
+      "processedSessionIds",
+      "sessions",
+      "lastSyncedAt",
+    ]).then((data) => {
+      console.log("[debug] storage:", {
+        sessions: data.sessions?.length || 0,
+        processed: data.processedSessionIds?.length || 0,
+        minutes: Object.values(data.siteStats || {}).reduce(
+          (s, x: any) => s + (x.minutes || 0),
+          0
+        ),
+        lastSynced: data.lastSyncedAt
+          ? new Date(data.lastSyncedAt).toLocaleString()
+          : "never",
+      });
+      return data;
+    }),
 };
 console.log("[histo] debug functions available at window.histoDebug");
