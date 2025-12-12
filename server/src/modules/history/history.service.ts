@@ -44,8 +44,25 @@ export class HistoryService {
 
     for (const historyDto of histories) {
       try {
-        const history = await this.create(historyDto, userId);
-        results.push(history);
+        const existingHistory = await this.historyRepository.findOne(
+          {
+            where: {
+              url: historyDto.url,
+              title: historyDto.title,
+              userId: userId
+            }
+          }
+        )
+        if (existingHistory) {
+          existingHistory.useTime += historyDto.useTime || 0;
+          existingHistory.visitedAt = new Date(); // 마지막 방문 시간 업데이트
+          await this.historyRepository.save(existingHistory);
+          results.push(existingHistory);
+        }
+        else {
+          const history = await this.create(historyDto, userId);
+          results.push(history);
+        }
       } catch (error) {
         console.error(`Failed to create history for ${historyDto.url}:`, error);
       }
