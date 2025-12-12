@@ -19,6 +19,13 @@ export default function Overview() {
   const state = useUsageStore();
   const { categoryStats, totalTimeMinutes, loading } = state;
 
+  console.log("[Overview] state:", {
+    categoryStats,
+    totalTimeMinutes,
+    loading,
+    fullState: state,
+  });
+
   const categoriesWithColor = useMemo(() => {
     return [...categoryStats]
       .sort((a, b) => b.minutes - a.minutes)

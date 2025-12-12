@@ -90,6 +90,67 @@ const defaultState: UsageState = {
 
 const UsageContext = createContext<UsageState>(defaultState);
 
+const BACKEND_URL = "http://localhost:3000";
+
+// 백엔드 API에서 데이터 가져오기
+const fetchFromBackend = async (): Promise<UsageState | null> => {
+  try {
+    // JWT 토큰 가져오기
+    const { jwtToken } = await new Promise<{ jwtToken?: string }>((resolve) => {
+      chrome.storage.local.get(["jwtToken"], (result) => resolve(result));
+    });
+
+    if (!jwtToken) {
+      console.log("[histo] no JWT token, skip backend fetch");
+      return null;
+    }
+
+    // 카테고리 통계 가져오기
+    const response = await fetch(`${BACKEND_URL}/history/stats/category`, {
+      headers: {
+        Authorization: `Bearer ${jwtToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("[histo] backend data:", data);
+
+    // 백엔드 응답 형식: { categoryId, categoryName, totalTime, count }[]
+    const categoryStats: CategoryStat[] = data.map((cat: any) => ({
+      name: cat.categoryName || "기타",
+      minutes: Math.round((cat.totalTime || 0) / 60), // 초 → 분
+      visits: cat.count || 0,
+      sites: 1, // 카테고리당 사이트 수는 별도 집계 필요
+    }));
+
+    const totalTimeMinutes = categoryStats.reduce(
+      (sum, cat) => sum + cat.minutes,
+      0
+    );
+    const totalVisits = categoryStats.reduce((sum, cat) => sum + cat.visits, 0);
+
+    const result = {
+      totalTimeMinutes,
+      totalSites: categoryStats.length, // 카테고리 개수
+      totalVisits,
+      siteStats: [], // 사이트별 통계는 별도 API 필요
+      categoryStats,
+      analysisState: "backend",
+      loading: false,
+    };
+
+    console.log("[histo] transformed backend data:", result);
+    return result;
+  } catch (error) {
+    console.error("[histo] failed to fetch from backend:", error);
+    return null;
+  }
+};
+
 const convertStorageToState = (storage: Record<string, any>): UsageState => {
   const siteStats = storage.siteStats ?? {};
   const categoryStats = storage.categoryStats ?? {};
@@ -128,7 +189,22 @@ export const UsageProvider = ({
       }
 
       try {
-        // First, try to load from local storage immediately
+        // 1️⃣ 먼저 백엔드에서 데이터 가져오기 시도
+        const backendData = await fetchFromBackend();
+        console.log("[histo] fetchFromBackend result:", backendData);
+
+        if (backendData) {
+          console.log("[histo] ✅ using backend data", {
+            categories: backendData.categoryStats.length,
+            totalTime: backendData.totalTimeMinutes,
+            totalVisits: backendData.totalVisits,
+          });
+          setState(backendData);
+          return;
+        }
+
+        // 2️⃣ 백엔드 실패 시 로컬 스토리지 사용
+        console.log("[histo] falling back to local storage");
         const storageData = await new Promise<any>((resolve) => {
           chrome.storage.local.get(
             [
@@ -146,38 +222,16 @@ export const UsageProvider = ({
 
         console.log("[histo] loaded from storage:", storageData);
 
-        // Then, request background to aggregate and update data
-        // Note: This may fail if background worker isn't ready, but that's okay - we use storage data
+        // Background에 데이터 요청 (비동기)
         if (chrome.runtime?.sendMessage) {
-          const response = await new Promise<any>((resolve) => {
-            const timeout = setTimeout(() => {
-              resolve(null);
-            }, 2000);
-
-            try {
-              chrome.runtime.sendMessage({ action: "get-data" }, (response) => {
-                clearTimeout(timeout);
-                if (chrome.runtime.lastError) {
-                  // Silently ignore - storage data is sufficient
-                  resolve(null);
-                } else {
-                  resolve(response);
-                }
-              });
-            } catch (err) {
-              clearTimeout(timeout);
-              resolve(null);
+          chrome.runtime.sendMessage({ action: "get-data" }, () => {
+            if (chrome.runtime.lastError) {
+              // 무시
             }
           });
-
-          if (response?.ok && response?.data) {
-            console.log("[histo] got data from background:", response.data);
-            setState(convertStorageToState(response.data));
-            return;
-          }
         }
 
-        // Use storage data if background response failed
+        // 로컬 데이터 사용
         const siteStats = storageData?.siteStats ?? {};
         const totalMinutes = storageData?.dailyTotals?.totalMinutes ?? 0;
         const hasSiteStats = Object.keys(siteStats).length > 0;
@@ -185,7 +239,7 @@ export const UsageProvider = ({
         if (hasSiteStats || totalMinutes > 0) {
           setState(convertStorageToState(storageData));
         } else {
-          // Only use demo if no actual data at all
+          // 데이터가 전혀 없으면 데모 사용
           setState(demoState);
         }
       } catch (err) {

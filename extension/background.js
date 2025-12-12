@@ -5,7 +5,6 @@
   var DAY_KEY = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   var CURRENT_SESSION_KEY = "currentSession";
   var BACKEND_URL = "http://localhost:3000";
-  var SYNC_INTERVAL_MINUTES = 5;
   var randomId = () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   var storageGet = (keys) => new Promise(
     (resolve) => chrome.storage.local.get(keys ?? null, (res) => resolve(res))
@@ -97,7 +96,7 @@
       await storageSet({ lastDate: currentDate });
     }
   };
-  var syncToBackend = async () => {
+  var syncToBackend = async (forceFull = false) => {
     try {
       const { jwtToken } = await storageGet(["jwtToken"]);
       if (!jwtToken) {
@@ -106,33 +105,91 @@
       }
       const { sessions = [], lastSyncedAt } = await storageGet(["sessions", "lastSyncedAt"]);
       const unsyncedSessions = sessions.filter(
-        (s) => s.end && s.url && s.url.startsWith("http") && (!lastSyncedAt || s.start > lastSyncedAt)
+        (s) => s.end && s.url && s.url.startsWith("http") && (forceFull || !lastSyncedAt || s.start > lastSyncedAt)
       );
       if (unsyncedSessions.length === 0) {
         console.log("[histo] no new sessions to sync");
         return;
       }
-      const histories = unsyncedSessions.map((session) => ({
-        url: session.url,
-        title: session.domain || new URL(session.url).hostname,
-        // Use domain or extract from URL
-        useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0
-        // Convert to seconds
-      }));
-      console.log(`[histo] syncing ${histories.length} sessions to backend...`);
-      const response = await fetch(`${BACKEND_URL}/history/batch`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwtToken}`
-        },
-        body: JSON.stringify({ histories })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+      const histories = unsyncedSessions.map((session, index) => {
+        try {
+          if (!session.url || typeof session.url !== "string") {
+            console.warn(`[histo] skipping empty URL at index ${index}`);
+            return null;
+          }
+          const urlObj = new URL(session.url);
+          if (!urlObj.protocol.startsWith("http")) {
+            console.warn(`[histo] skipping non-http URL: ${session.url}`);
+            return null;
+          }
+          if (!urlObj.hostname || urlObj.hostname === "") {
+            console.warn(
+              `[histo] skipping URL with no hostname: ${session.url}`
+            );
+            return null;
+          }
+          const urlString = session.url.trim();
+          const isLocalhostOrIP = urlObj.hostname === "localhost" || urlObj.hostname.startsWith("127.") || urlObj.hostname.startsWith("192.168.") || /^\d+\.\d+\.\d+\.\d+$/.test(urlObj.hostname);
+          if (!isLocalhostOrIP && !urlString.match(/^https?:\/\/[^\/]+\.[^\/]+/)) {
+            console.warn(`[histo] skipping malformed URL: ${session.url}`);
+            return null;
+          }
+          const urlPattern = /^(?:http|https):\/\/(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost)(?::\d{2,5})?(?:\/[^\s]*)?$/i;
+          if (!urlPattern.test(urlString)) {
+            console.warn(
+              `[histo] URL failed strict validation: ${session.url}`
+            );
+            return null;
+          }
+          return {
+            url: urlString,
+            title: session.domain || urlObj.hostname,
+            useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0
+          };
+        } catch (err) {
+          console.warn(
+            `[histo] invalid URL at index ${index}, skipping: ${session.url}`,
+            err
+          );
+          return null;
+        }
+      }).filter((h) => h !== null);
+      if (histories.length === 0) {
+        console.log("[histo] no valid sessions to sync after filtering");
+        return;
       }
-      const result = await response.json();
-      console.log("[histo] sync successful:", result);
+      console.log(`[histo] syncing ${histories.length} sessions to backend...`);
+      const BATCH_SIZE = 50;
+      const batches = [];
+      for (let i = 0; i < histories.length; i += BATCH_SIZE) {
+        batches.push(histories.slice(i, i + BATCH_SIZE));
+      }
+      console.log(`[histo] split into ${batches.length} batches`);
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        console.log(`[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`);
+        const response = await fetch(`${BACKEND_URL}/history/batch`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwtToken}`
+          },
+          body: JSON.stringify({ histories: batch })
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          if (response.status === 400) {
+            console.error(`[histo] batch ${i + 1} validation failed. Sample URLs:`);
+            batch.slice(0, 10).forEach((h, idx) => {
+              console.log(`  [${idx}] ${h.url}`);
+            });
+          }
+          throw new Error(`HTTP ${response.status} on batch ${i + 1}: ${errorText}`);
+        }
+        const result = await response.json();
+        console.log(`[histo] batch ${i + 1}/${batches.length} successful:`, result);
+      }
+      console.log(`[histo] all ${batches.length} batches synced successfully`);
       await storageSet({ lastSyncedAt: Date.now() });
     } catch (error) {
       console.error("[histo] sync failed:", error);
@@ -450,11 +507,22 @@
   chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
     if (msg?.action === "start-analysis") {
       console.log("[histo] start-analysis request");
-      aggregateAndStore().then(() => {
-        console.log("[histo] start-analysis complete");
+      aggregateAndStore().then(() => syncToBackend(true)).then(() => {
+        console.log("[histo] start-analysis complete (aggregated + synced)");
         sendResponse({ ok: true });
       }).catch((err) => {
         console.error("[histo] start-analysis error:", err);
+        sendResponse({ ok: false, error: err?.message });
+      });
+      return true;
+    }
+    if (msg?.action === "manual-sync") {
+      console.log("[histo] manual sync request");
+      syncToBackend().then(() => {
+        console.log("[histo] manual sync complete");
+        sendResponse({ ok: true });
+      }).catch((err) => {
+        console.error("[histo] manual sync error:", err);
         sendResponse({ ok: false, error: err?.message });
       });
       return true;
@@ -476,14 +544,10 @@
   });
   console.log("[histo] background script loaded");
   chrome.alarms.create("aggregate", { periodInMinutes: 1 });
-  chrome.alarms.create("syncToBackend", { periodInMinutes: SYNC_INTERVAL_MINUTES });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "aggregate") {
       console.log("[histo] alarm triggered, aggregating");
       aggregateAndStore().catch(console.error);
-    } else if (alarm.name === "syncToBackend") {
-      console.log("[histo] sync alarm triggered");
-      syncToBackend().catch(console.error);
     }
   });
   loadPersistedCurrentSession().then((session) => {
@@ -496,20 +560,23 @@
     testAggregate: () => aggregateAndStore(),
     testSync: () => syncToBackend(),
     // 🆕 Test sync function
-    checkStorage: () => storageGet(["siteStats", "processedSessionIds", "sessions", "lastSyncedAt"]).then(
-      (data) => {
-        console.log("[debug] storage:", {
-          sessions: data.sessions?.length || 0,
-          processed: data.processedSessionIds?.length || 0,
-          minutes: Object.values(data.siteStats || {}).reduce(
-            (s, x) => s + (x.minutes || 0),
-            0
-          ),
-          lastSynced: data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : "never"
-        });
-        return data;
-      }
-    )
+    checkStorage: () => storageGet([
+      "siteStats",
+      "processedSessionIds",
+      "sessions",
+      "lastSyncedAt"
+    ]).then((data) => {
+      console.log("[debug] storage:", {
+        sessions: data.sessions?.length || 0,
+        processed: data.processedSessionIds?.length || 0,
+        minutes: Object.values(data.siteStats || {}).reduce(
+          (s, x) => s + (x.minutes || 0),
+          0
+        ),
+        lastSynced: data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : "never"
+      });
+      return data;
+    })
   };
   console.log("[histo] debug functions available at window.histoDebug");
 })();
