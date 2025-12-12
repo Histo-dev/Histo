@@ -4,6 +4,7 @@ import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
 import { History } from '../../entities/history.entity';
 import { CreateHistoryDto } from './dto/create-history.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
+import { HistoryResponseDto } from './dto/history-response.dto';
 import { ClassificationService } from '../ml/classification.service';
 
 @Injectable()
@@ -24,11 +25,15 @@ export class HistoryService {
       title: createHistoryDto.title,
     });
 
+    // URL에서 도메인 추출
+    const domain = this.extractDomain(createHistoryDto.url);
+
     const history = this.historyRepository.create({
       userId: userId,
       url: createHistoryDto.url,
       title: createHistoryDto.title,
       useTime: createHistoryDto.useTime || 0,
+      domain: domain || '',
       categoryId: classification.categoryId,
       visitedAt: new Date(),
     });
@@ -72,9 +77,31 @@ export class HistoryService {
   }
 
   /**
+   * 오늘 날짜의 히스토리 조회
+   */
+  async getTodayHistory(userId: string): Promise<HistoryResponseDto[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const histories = await this.historyRepository.find({
+      where: {
+        userId,
+        visitedAt: Between(today, tomorrow),
+      },
+      relations: ['category'],
+      order: { visitedAt: 'DESC' },
+    });
+
+    return histories.map((history) => this.toResponseDto(history));
+  }
+
+  /**
    * 히스토리 조회 (필터링)
    */
-  async findAll(query: HistoryQueryDto): Promise<History[]> {
+  async findAll(query: HistoryQueryDto): Promise<HistoryResponseDto[]> {
     const {
       userId,
       categoryId,
@@ -103,13 +130,15 @@ export class HistoryService {
       whereCondition.visitedAt = LessThanOrEqual(new Date(endDate));
     }
 
-    return await this.historyRepository.find({
+    const histories = await this.historyRepository.find({
       where: whereCondition,
-      relations: ['category', 'user'],
+      relations: ['category'],
       order: { visitedAt: 'DESC' },
       take: limit,
       skip: offset,
     });
+
+    return histories.map((history) => this.toResponseDto(history));
   }
 
   /**
@@ -275,12 +304,43 @@ export class HistoryService {
 
   /**
    * URL에서 도메인 추출
+   * 프로토콜이 없는 URL(예: google.com)도 처리
    */
   private extractDomain(url: string): string | null {
     try {
-      return new URL(url).hostname;
+      // 프로토콜이 없으면 https://를 추가
+      const urlWithProtocol = url.startsWith('http://') || url.startsWith('https://')
+        ? url
+        : `https://${url}`;
+
+      const parsedUrl = new URL(urlWithProtocol);
+      return parsedUrl.hostname;
     } catch {
+      // URL 파싱 실패 시 null 반환
       return null;
     }
+  }
+
+  /**
+   * History 엔티티를 응답 DTO로 변환 (embedding 제외)
+   */
+  private toResponseDto(history: History): HistoryResponseDto {
+    return {
+      id: history.id,
+      userId: history.userId,
+      categoryId: history.categoryId,
+      url: history.url,
+      title: history.title,
+      meta: history.meta,
+      useTime: history.useTime,
+      visitedAt: history.visitedAt,
+      domain: history.domain || '',
+      category: history.category
+        ? {
+            id: history.category.id,
+            name: history.category.name,
+          }
+        : undefined,
+    };
   }
 }

@@ -6,7 +6,7 @@ export class CreateHistoryDto {
     description: '방문한 페이지의 URL',
     example: 'https://github.com/trending'
   })
-  @IsUrl()
+  @IsString()
   @IsNotEmpty()
   url: string;
 
