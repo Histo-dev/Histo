@@ -164,7 +164,9 @@
       for (let i = 0; i < histories.length; i += BATCH_SIZE) {
         batches.push(histories.slice(i, i + BATCH_SIZE));
       }
-      console.log(`[histo] split into ${batches.length} batches, sending in parallel...`);
+      console.log(
+        `[histo] split into ${batches.length} batches, sending in parallel...`
+      );
       const batchPromises = batches.map(async (batch, i) => {
         console.log(
           `[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`

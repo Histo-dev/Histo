@@ -37,11 +37,22 @@ function PopUpRoutes({ onRefresh }: { onRefresh: () => void }) {
     });
   };
 
+  const viewSavedAnalysis = () => {
+    // Just refresh data (GET only, no POST) and navigate
+    onRefresh();
+    navigate("/analysis/overview");
+  };
+
   if (isLoading) return <Loading />;
 
   return (
     <Routes>
-      <Route path="/" element={<HistoIntro onStart={startAnalysis} />} />
+      <Route
+        path="/"
+        element={
+          <HistoIntro onStart={startAnalysis} onViewSaved={viewSavedAnalysis} />
+        }
+      />
       <Route
         path="/analysis/*"
         element={<Analysis onBack={() => navigate("/")} />}
