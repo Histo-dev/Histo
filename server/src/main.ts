@@ -1,9 +1,9 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
+import { AppModule } from "./app.module";
+import { ConfigService } from "@nestjs/config";
+import { AllExceptionsFilter } from "./common/filters/http-exception.filter";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,15 +15,15 @@ async function bootstrap() {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
-    }),
+    })
   );
 
   // Global Exception Filter
   app.useGlobalFilters(new AllExceptionsFilter());
 
-  // CORS 설정
+  // CORS 설정 - 개발 환경에서는 모든 origin 허용
   app.enableCors({
-    origin: ['chrome-extension://*', 'http://localhost:3000'],
+    origin: true, // 모든 origin 허용 (개발용)
     credentials: true,
   });
 
@@ -51,9 +51,9 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
+  SwaggerModule.setup("api-docs", app, document);
 
-  const port = configService.get<number>('PORT', 3000);
+  const port = configService.get<number>("PORT", 3000);
   await app.listen(port);
 
   console.log(`
@@ -63,7 +63,9 @@ async function bootstrap() {
 ║                                                       ║
 ║   Server:    http://localhost:${port}                    ║
 ║   API Docs:  http://localhost:${port}/api-docs           ║
-║   Env:       ${configService.get<string>('NODE_ENV')}                              ║
+║   Env:       ${configService.get<string>(
+    "NODE_ENV"
+  )}                              ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
   `);
