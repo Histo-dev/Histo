@@ -7,16 +7,18 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { HistoryService } from './history.service';
 import { BatchCreateHistoryDto } from './dto/batch-create-history.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
+import { HistoryResponseDto } from './dto/history-response.dto';
 import {
   CurrentUser,
   CurrentUserData,
 } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('History')
+@ApiBearerAuth('access-token')
 @Controller('history')
 export class HistoryController {
   constructor(private readonly historyService: HistoryService) {}
@@ -36,12 +38,22 @@ export class HistoryController {
   }
 
   /**
+   * 오늘 날짜의 내 히스토리 조회
+   */
+  @Get('today')
+  @ApiOperation({ summary: '오늘의 히스토리 조회', description: '현재 로그인한 사용자의 오늘 날짜 히스토리를 조회합니다.' })
+  @ApiResponse({ status: 200, description: '오늘의 히스토리 목록 조회 성공', type: [HistoryResponseDto] })
+  async getTodayHistory(@CurrentUser() currentUser: CurrentUserData): Promise<HistoryResponseDto[]> {
+    return await this.historyService.getTodayHistory(currentUser.id);
+  }
+
+  /**
    * 히스토리 조회 (필터링)
    */
   @Get()
   @ApiOperation({ summary: '히스토리 조회', description: '사용자 ID, 카테고리, 날짜 범위 등으로 필터링하여 히스토리를 조회합니다.' })
-  @ApiResponse({ status: 200, description: '히스토리 목록 조회 성공' })
-  async findAll(@Query() query: HistoryQueryDto) {
+  @ApiResponse({ status: 200, description: '히스토리 목록 조회 성공', type: [HistoryResponseDto] })
+  async findAll(@Query() query: HistoryQueryDto): Promise<HistoryResponseDto[]> {
     return await this.historyService.findAll(query);
   }
 

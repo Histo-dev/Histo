@@ -34,6 +34,9 @@ export class History {
   @Column({ name: 'use_time', type: 'integer', default: 0 })
   useTime: number; // 체류 시간 (초 단위)
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  domain: string; // URL에서 추출한 도메인
+
   @Column({ name: 'visited_at', type: 'timestamp' })
   visitedAt: Date;
 
@@ -45,13 +48,4 @@ export class History {
   @ManyToOne(() => Category, (category) => category.histories, { nullable: true })
   @JoinColumn({ name: 'category_id' })
   category: Category;
-
-  // 도메인 추출용 getter
-  get domain(): string {
-    try {
-      return new URL(this.url).hostname;
-    } catch {
-      return '';
-    }
-  }
 }

@@ -29,14 +29,25 @@ async function bootstrap() {
 
   // Swagger 문서화
   const config = new DocumentBuilder()
-    .setTitle("HISTO API")
-    .setDescription("히스토리 분석 및 관리 API 문서")
-    .setVersion("1.0")
-    .addTag("User", "사용자 관리")
-    .addTag("Category", "카테고리 관리")
-    .addTag("History", "히스토리 관리 및 통계")
-    .addTag("Advice", "조언 생성")
-    .addTag("Health", "서버 상태 확인")
+    .setTitle('HISTO API')
+    .setDescription('히스토리 분석 및 관리 API 문서')
+    .setVersion('1.0')
+    .addTag('User', '사용자 관리')
+    .addTag('Category', '카테고리 관리')
+    .addTag('History', '히스토리 관리 및 통계')
+    .addTag('Advice', '조언 생성')
+    .addTag('Health', '서버 상태 확인')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'access-token',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
