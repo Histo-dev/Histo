@@ -4,6 +4,7 @@
   var MAX_SESSIONS = 500;
   var DAY_KEY = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   var CURRENT_SESSION_KEY = "currentSession";
+  var BACKEND_URL = "http://localhost:3000";
   var randomId = () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   var storageGet = (keys) => new Promise(
     (resolve) => chrome.storage.local.get(keys ?? null, (res) => resolve(res))
@@ -68,6 +69,9 @@
       if (dailyTotals && dailyTotals.totalMinutes > 0) {
         await archiveDailyData(dailyTotals);
       }
+      await syncToBackend().catch(
+        (err) => console.error("[histo] failed to sync before daily reset:", err)
+      );
       await storageSet({
         sessions: [],
         visits: [],
@@ -81,13 +85,127 @@
           totalSites: 0,
           totalVisits: 0
         },
-        lastDate: currentDate
+        lastDate: currentDate,
+        lastSyncedAt: null
+        // Reset sync timestamp
       });
       currentSession = null;
       console.log("[histo] new day detected, data reset");
     }
     if (!lastDate) {
       await storageSet({ lastDate: currentDate });
+    }
+  };
+  var syncToBackend = async (forceFull = false) => {
+    try {
+      const { jwtToken } = await storageGet(["jwtToken"]);
+      if (!jwtToken) {
+        console.log("[histo] skip sync: not logged in");
+        return;
+      }
+      const { sessions = [], lastSyncedAt } = await storageGet(["sessions", "lastSyncedAt"]);
+      const unsyncedSessions = sessions.filter(
+        (s) => s.end && s.url && s.url.startsWith("http") && (forceFull || !lastSyncedAt || s.start > lastSyncedAt)
+      );
+      if (unsyncedSessions.length === 0) {
+        console.log("[histo] no new sessions to sync");
+        return;
+      }
+      const histories = unsyncedSessions.map((session, index) => {
+        try {
+          if (!session.url || typeof session.url !== "string") {
+            console.warn(`[histo] skipping empty URL at index ${index}`);
+            return null;
+          }
+          const urlObj = new URL(session.url);
+          if (!urlObj.protocol.startsWith("http")) {
+            console.warn(`[histo] skipping non-http URL: ${session.url}`);
+            return null;
+          }
+          if (!urlObj.hostname || urlObj.hostname === "") {
+            console.warn(
+              `[histo] skipping URL with no hostname: ${session.url}`
+            );
+            return null;
+          }
+          const urlString = session.url.trim();
+          const isLocalhostOrIP = urlObj.hostname === "localhost" || urlObj.hostname.startsWith("127.") || urlObj.hostname.startsWith("192.168.") || /^\d+\.\d+\.\d+\.\d+$/.test(urlObj.hostname);
+          if (!isLocalhostOrIP && !urlString.match(/^https?:\/\/[^\/]+\.[^\/]+/)) {
+            console.warn(`[histo] skipping malformed URL: ${session.url}`);
+            return null;
+          }
+          const urlPattern = /^(?:http|https):\/\/(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost)(?::\d{2,5})?(?:\/[^\s]*)?$/i;
+          if (!urlPattern.test(urlString)) {
+            console.warn(
+              `[histo] URL failed strict validation: ${session.url}`
+            );
+            return null;
+          }
+          return {
+            url: urlString,
+            title: session.domain || urlObj.hostname,
+            useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0
+          };
+        } catch (err) {
+          console.warn(
+            `[histo] invalid URL at index ${index}, skipping: ${session.url}`,
+            err
+          );
+          return null;
+        }
+      }).filter((h) => h !== null);
+      if (histories.length === 0) {
+        console.log("[histo] no valid sessions to sync after filtering");
+        return;
+      }
+      console.log(`[histo] syncing ${histories.length} sessions to backend...`);
+      const BATCH_SIZE = 100;
+      const batches = [];
+      for (let i = 0; i < histories.length; i += BATCH_SIZE) {
+        batches.push(histories.slice(i, i + BATCH_SIZE));
+      }
+      console.log(
+        `[histo] split into ${batches.length} batches, sending in parallel...`
+      );
+      const batchPromises = batches.map(async (batch, i) => {
+        console.log(
+          `[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`
+        );
+        const response = await fetch(`${BACKEND_URL}/history/batch`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwtToken}`
+          },
+          body: JSON.stringify({ histories: batch })
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          if (response.status === 400) {
+            console.error(
+              `[histo] batch ${i + 1} validation failed. Sample URLs:`
+            );
+            batch.slice(0, 10).forEach((h, idx) => {
+              console.log(`  [${idx}] ${h.url}`);
+            });
+          }
+          throw new Error(
+            `HTTP ${response.status} on batch ${i + 1}: ${errorText}`
+          );
+        }
+        const result = await response.json();
+        console.log(
+          `[histo] batch ${i + 1}/${batches.length} successful:`,
+          result
+        );
+        return result;
+      });
+      await Promise.all(batchPromises);
+      console.log(`[histo] all ${batches.length} batches synced successfully`);
+      await storageSet({ lastSyncedAt: Date.now() });
+    } catch (error) {
+      console.error("[histo] sync failed:", error);
+      throw error;
     }
   };
   var categorize = (domain, title, categoryMap) => {
@@ -401,11 +519,22 @@
   chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
     if (msg?.action === "start-analysis") {
       console.log("[histo] start-analysis request");
-      aggregateAndStore().then(() => {
-        console.log("[histo] start-analysis complete");
+      aggregateAndStore().then(() => syncToBackend(true)).then(() => {
+        console.log("[histo] start-analysis complete (aggregated + synced)");
         sendResponse({ ok: true });
       }).catch((err) => {
         console.error("[histo] start-analysis error:", err);
+        sendResponse({ ok: false, error: err?.message });
+      });
+      return true;
+    }
+    if (msg?.action === "manual-sync") {
+      console.log("[histo] manual sync request");
+      syncToBackend().then(() => {
+        console.log("[histo] manual sync complete");
+        sendResponse({ ok: true });
+      }).catch((err) => {
+        console.error("[histo] manual sync error:", err);
         sendResponse({ ok: false, error: err?.message });
       });
       return true;
@@ -441,19 +570,25 @@
   }).catch((err) => console.error("[histo] failed to restore session", err));
   globalThis.histoDebug = {
     testAggregate: () => aggregateAndStore(),
-    checkStorage: () => storageGet(["siteStats", "processedSessionIds", "sessions"]).then(
-      (data) => {
-        console.log("[debug] storage:", {
-          sessions: data.sessions?.length || 0,
-          processed: data.processedSessionIds?.length || 0,
-          minutes: Object.values(data.siteStats || {}).reduce(
-            (s, x) => s + (x.minutes || 0),
-            0
-          )
-        });
-        return data;
-      }
-    )
+    testSync: () => syncToBackend(),
+    // 🆕 Test sync function
+    checkStorage: () => storageGet([
+      "siteStats",
+      "processedSessionIds",
+      "sessions",
+      "lastSyncedAt"
+    ]).then((data) => {
+      console.log("[debug] storage:", {
+        sessions: data.sessions?.length || 0,
+        processed: data.processedSessionIds?.length || 0,
+        minutes: Object.values(data.siteStats || {}).reduce(
+          (s, x) => s + (x.minutes || 0),
+          0
+        ),
+        lastSynced: data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : "never"
+      });
+      return data;
+    })
   };
   console.log("[histo] debug functions available at window.histoDebug");
 })();

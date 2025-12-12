@@ -35,9 +35,16 @@
   line-height: 1.6;
   margin: 0 0 14px;
 }
+.buttonGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 .cta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   background: linear-gradient(90deg, var(--accent), var(--primary));
   color: #fff;
@@ -47,6 +54,21 @@
   cursor: pointer;
   font-size: 14px;
   box-shadow: var(--shadow);
+  font-weight: 600;
+}
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #f5f5f7;
+  color: #4f39f6;
+  border: 1px solid #e0e0e5;
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
 }
 .ctaIcon {
   display: inline-flex;

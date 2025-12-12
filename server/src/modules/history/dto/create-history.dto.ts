@@ -1,7 +1,13 @@
-import { IsString, IsNotEmpty, IsUrl, IsOptional, IsNumber, Min } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  Min,
+} from "class-validator";
 
 export class CreateHistoryDto {
-  @IsUrl()
+  @IsString()
   @IsNotEmpty()
   url: string;
 
