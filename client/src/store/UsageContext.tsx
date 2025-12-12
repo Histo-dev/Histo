@@ -40,6 +40,7 @@ export type UsageState = {
   analysisState?: string;
   loading: boolean;
   dailyHistory?: Record<string, DailyTotals>;
+  dataRangeDays?: number; // 데이터가 커버하는 일수
 };
 
 const demoState: UsageState = {
@@ -105,9 +106,9 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
       return null;
     }
 
-    // 로컬 siteStats도 함께 가져오기 (TopN 페이지용)
+    // 로컬 siteStats, dailyHistory 함께 가져오기
     const localStorage = await new Promise<any>((resolve) => {
-      chrome.storage.local.get(["siteStats"], (result) => resolve(result));
+      chrome.storage.local.get(["siteStats", "dailyHistory"], (result) => resolve(result));
     });
 
     // 카테고리 통계 가져오기
@@ -142,6 +143,11 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
     const siteStatsObj = localStorage?.siteStats || {};
     const siteStats = Object.values(siteStatsObj) as SiteStat[];
 
+    // 데이터 범위 계산 (로컬 스토리지에서 가져오기)
+    const dailyHistory = localStorage?.dailyHistory || {};
+    const dates = Object.keys(dailyHistory);
+    const dataRangeDays = dates.length;
+
     const result = {
       totalTimeMinutes,
       totalSites: categoryStats.length, // 카테고리 개수
@@ -150,6 +156,7 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
       categoryStats,
       analysisState: "backend",
       loading: false,
+      dataRangeDays, // 데이터가 있는 날짜 수
     };
 
     console.log("[histo] transformed backend data:", result);
@@ -169,6 +176,10 @@ const convertStorageToState = (storage: Record<string, any>): UsageState => {
   const siteStatsArray = Object.values(siteStats) as SiteStat[];
   const categoryStatsArray = Object.values(categoryStats) as CategoryStat[];
 
+  // 데이터 범위 계산
+  const dates = Object.keys(dailyHistory);
+  const dataRangeDays = dates.length;
+
   return {
     totalTimeMinutes: dailyTotals.totalMinutes ?? 0,
     totalSites: dailyTotals.totalSites ?? 0,
@@ -178,6 +189,7 @@ const convertStorageToState = (storage: Record<string, any>): UsageState => {
     analysisState: storage.analysisState ?? "idle",
     loading: false,
     dailyHistory: dailyHistory,
+    dataRangeDays,
   };
 };
 

@@ -15,8 +15,21 @@ type PeriodType = "하루" | "일주일" | "한달";
 export default function Detail() {
   const navigate = useNavigate();
   const state = useUsageStore();
-  const { categoryStats, totalTimeMinutes, loading } = state;
-  const [period, setPeriod] = useState<PeriodType>("한달");
+  const { categoryStats, totalTimeMinutes, loading, dataRangeDays = 0 } = state;
+  const [period, setPeriod] = useState<PeriodType>("하루");
+
+  // 기간별 필요 데이터 일수
+  const requiredDays = {
+    하루: 0, // 하루는 무조건 활성화
+    일주일: 7,
+    한달: 30,
+  };
+
+  // 데이터 충분성 체크
+  const hasEnoughData = (periodType: PeriodType) => {
+    if (periodType === "하루") return true; // 하루는 항상 활성화
+    return dataRangeDays >= requiredDays[periodType];
+  };
 
   const formatTime = (mins: number) => {
     const hours = Math.floor(mins / 60);
@@ -68,18 +81,36 @@ export default function Detail() {
       <div className={styles.periodSection}>
         <div className={styles.periodLabel}>분석 기간</div>
         <div className={styles.periodButtons}>
-          {(["하루", "일주일", "한달"] as PeriodType[]).map((p) => (
-            <button
-              key={p}
-              className={`${styles.periodButton} ${
-                period === p ? styles.active : ""
-              }`}
-              onClick={() => setPeriod(p)}
-            >
-              {p}
-            </button>
-          ))}
+          {(["하루", "일주일", "한달"] as PeriodType[]).map((p) => {
+            const isAvailable = hasEnoughData(p);
+            return (
+              <button
+                key={p}
+                className={`${styles.periodButton} ${
+                  period === p ? styles.active : ""
+                } ${!isAvailable ? styles.disabled : ""}`}
+                onClick={() => isAvailable && setPeriod(p)}
+                disabled={!isAvailable}
+                title={
+                  !isAvailable
+                    ? `${requiredDays[p]}일 이상의 데이터가 필요합니다 (현재: ${dataRangeDays}일)`
+                    : undefined
+                }
+              >
+                {p}
+                {!isAvailable && (
+                  <span className={styles.disabledBadge}>데이터 부족</span>
+                )}
+              </button>
+            );
+          })}
         </div>
+        {dataRangeDays < 30 && (
+          <div className={styles.dataRangeInfo}>
+            현재 {dataRangeDays}일치 데이터 수집됨 • 더 많은 데이터를 수집하면
+            추가 분석이 가능합니다
+          </div>
+        )}
       </div>
 
       {/* 총 사용 시간 */}
