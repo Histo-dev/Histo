@@ -1,12 +1,17 @@
-import { IsString, IsNotEmpty, IsUrl, IsOptional, IsNumber, Min } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  Min,
+} from "class-validator";
 
 export class CreateHistoryDto {
   @ApiProperty({
     description: '방문한 페이지의 URL',
     example: 'https://github.com/trending'
   })
-  @IsUrl()
+  @IsString()
   @IsNotEmpty()
   url: string;
 
@@ -26,5 +31,5 @@ export class CreateHistoryDto {
   @IsNumber()
   @Min(0)
   @IsOptional()
-  useTime?: number;
+  useTime?: number; // 체류 시간 (초 단위)
 }

@@ -22,9 +22,23 @@ const Domain = ({
   onOpen,
   showDomain = false,
 }: Props) => {
+  // Get display name for domain (handles extension IDs)
+  const getDisplayName = (domain: string): string => {
+    // Extension ID - show as "Histo"
+    if (domain === "ncpbnmigfbdpnpppjfefnknhbfpfjfgl") {
+      return "Histo";
+    }
+    return domain;
+  };
+
   // Get accurate favicon based on domain/service
   const getAccurateFaviconUrl = (domain: string): string => {
     const lowercaseDomain = domain.toLowerCase();
+
+    // Extension ID - use Histo icon or placeholder
+    if (domain === "ncpbnmigfbdpnpppjfefnknhbfpfjfgl") {
+      return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect fill='%234CAF50' width='48' height='48'/%3E%3Ctext x='24' y='30' font-size='20' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E";
+    }
 
     // Special cases for better icons
     if (
@@ -69,23 +83,31 @@ const Domain = ({
     ) {
       return "https://github.githubassets.com/favicons/favicon.ico";
     }
+    if (
+      lowercaseDomain.includes("konkuk.ac.kr") ||
+      lowercaseDomain === "konkuk.ac.kr"
+    ) {
+      return "https://www.konkuk.ac.kr/favicon.ico";
+    }
 
     // Fallback to DuckDuckGo Icon API (better than Google's)
     return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
   };
 
   const faviconUrl = getAccurateFaviconUrl(site.domain);
+  const displayName = getDisplayName(site.domain);
 
   return (
     <div key={site.domain} className={styles.row}>
       <img
         src={faviconUrl}
-        alt={site.domain}
+        alt={displayName}
         className={styles.favicon}
-        title={site.domain}
+        title={displayName}
         onError={(e) => {
-          // Fallback to Google favicon if DuckDuckGo fails
-          if (!e.currentTarget.src.includes("google.com/s2/favicons")) {
+          const src = e.currentTarget.src;
+          // Try Google favicon as fallback
+          if (!src.includes("google.com/s2/favicons")) {
             e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
               site.domain
             )}&sz=32`;
@@ -96,7 +118,7 @@ const Domain = ({
         }}
       />
       <span className={styles.legendName}>
-        {showDomain ? site.domain : site.category ?? "기타"}
+        {showDomain ? displayName : site.category ?? "기타"}
       </span>
       <div className={styles.time}>{formatedTime}</div>
       <div className={styles.pct}>{percentage}%</div>

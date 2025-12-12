@@ -25,7 +25,7 @@
   --radius: 12px;
   --panel-padding: 20px;
   --card-bg: #ffffff;
-  --shadow: 0 6px 18px rgba(79,57,246,0.06);
+  --shadow: 0 6px 18px rgba(79, 57, 246, 0.06);
 }
 
 a {
@@ -65,11 +65,15 @@ body {
   height: 100%;
   min-height: 100%;
   box-sizing: border-box;
-  padding: 10px; 
+  padding: 0 10px 0 10px;
   overflow: auto; /* allow inner scrolling when content exceeds fixed popup height */
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%); /* fill empty area */
+  background: linear-gradient(
+    180deg,
+    var(--bg-start) 0%,
+    var(--bg-end) 100%
+  ); /* fill empty area */
 }
 
 /* Popup tab bar */
@@ -86,14 +90,14 @@ body {
   font-size: 12px;
   border-radius: 8px;
   border: 1px solid transparent;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   flex: 0 0 auto;
 }
 .popup-tab.active {
-  background: linear-gradient(90deg,#7c63ff,#4f39f6);
+  background: linear-gradient(90deg, #7c63ff, #4f39f6);
   color: #fff;
-  box-shadow: 0 6px 18px rgba(79,57,246,0.12);
+  box-shadow: 0 6px 18px rgba(79, 57, 246, 0.12);
 }
 
 h1 {
