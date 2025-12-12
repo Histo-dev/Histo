@@ -159,15 +159,16 @@
         return;
       }
       console.log(`[histo] syncing ${histories.length} sessions to backend...`);
-      const BATCH_SIZE = 50;
+      const BATCH_SIZE = 100;
       const batches = [];
       for (let i = 0; i < histories.length; i += BATCH_SIZE) {
         batches.push(histories.slice(i, i + BATCH_SIZE));
       }
-      console.log(`[histo] split into ${batches.length} batches`);
-      for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        console.log(`[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`);
+      console.log(`[histo] split into ${batches.length} batches, sending in parallel...`);
+      const batchPromises = batches.map(async (batch, i) => {
+        console.log(
+          `[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`
+        );
         const response = await fetch(`${BACKEND_URL}/history/batch`, {
           method: "POST",
           headers: {
@@ -179,16 +180,25 @@
         if (!response.ok) {
           const errorText = await response.text();
           if (response.status === 400) {
-            console.error(`[histo] batch ${i + 1} validation failed. Sample URLs:`);
+            console.error(
+              `[histo] batch ${i + 1} validation failed. Sample URLs:`
+            );
             batch.slice(0, 10).forEach((h, idx) => {
               console.log(`  [${idx}] ${h.url}`);
             });
           }
-          throw new Error(`HTTP ${response.status} on batch ${i + 1}: ${errorText}`);
+          throw new Error(
+            `HTTP ${response.status} on batch ${i + 1}: ${errorText}`
+          );
         }
         const result = await response.json();
-        console.log(`[histo] batch ${i + 1}/${batches.length} successful:`, result);
-      }
+        console.log(
+          `[histo] batch ${i + 1}/${batches.length} successful:`,
+          result
+        );
+        return result;
+      });
+      await Promise.all(batchPromises);
       console.log(`[histo] all ${batches.length} batches synced successfully`);
       await storageSet({ lastSyncedAt: Date.now() });
     } catch (error) {

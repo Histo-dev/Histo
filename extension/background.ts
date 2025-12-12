@@ -292,18 +292,19 @@ const syncToBackend = async (forceFull = false) => {
 
     console.log(`[histo] syncing ${histories.length} sessions to backend...`);
 
-    // Split into batches of 50
-    const BATCH_SIZE = 50;
+    // Split into batches of 100 (increased from 50)
+    const BATCH_SIZE = 100;
     const batches: (typeof histories)[] = [];
     for (let i = 0; i < histories.length; i += BATCH_SIZE) {
       batches.push(histories.slice(i, i + BATCH_SIZE));
     }
 
-    console.log(`[histo] split into ${batches.length} batches`);
+    console.log(
+      `[histo] split into ${batches.length} batches, sending in parallel...`
+    );
 
-    // Send each batch
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
+    // Send all batches in parallel using Promise.all
+    const batchPromises = batches.map(async (batch, i) => {
       console.log(
         `[histo] sending batch ${i + 1}/${batches.length} (${
           batch.length
@@ -340,7 +341,11 @@ const syncToBackend = async (forceFull = false) => {
         `[histo] batch ${i + 1}/${batches.length} successful:`,
         result
       );
-    }
+      return result;
+    });
+
+    // Wait for all batches to complete
+    await Promise.all(batchPromises);
 
     console.log(`[histo] all ${batches.length} batches synced successfully`);
 

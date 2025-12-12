@@ -105,6 +105,11 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
       return null;
     }
 
+    // 로컬 siteStats도 함께 가져오기 (TopN 페이지용)
+    const localStorage = await new Promise<any>((resolve) => {
+      chrome.storage.local.get(["siteStats"], (result) => resolve(result));
+    });
+
     // 카테고리 통계 가져오기
     const response = await fetch(`${BACKEND_URL}/history/stats/category`, {
       headers: {
@@ -133,11 +138,15 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
     );
     const totalVisits = categoryStats.reduce((sum, cat) => sum + cat.visits, 0);
 
+    // 로컬 siteStats 변환
+    const siteStatsObj = localStorage?.siteStats || {};
+    const siteStats = Object.values(siteStatsObj) as SiteStat[];
+
     const result = {
       totalTimeMinutes,
       totalSites: categoryStats.length, // 카테고리 개수
       totalVisits,
-      siteStats: [], // 사이트별 통계는 별도 API 필요
+      siteStats, // 로컬 데이터 사용
       categoryStats,
       analysisState: "backend",
       loading: false,
