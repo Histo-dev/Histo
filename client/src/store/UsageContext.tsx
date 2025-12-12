@@ -108,7 +108,9 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
 
     // 로컬 siteStats, dailyHistory 함께 가져오기
     const localStorage = await new Promise<any>((resolve) => {
-      chrome.storage.local.get(["siteStats", "dailyHistory"], (result) => resolve(result));
+      chrome.storage.local.get(["siteStats", "dailyHistory"], (result) =>
+        resolve(result)
+      );
     });
 
     // 카테고리 통계 가져오기
