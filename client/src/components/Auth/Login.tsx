@@ -1,9 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BACKEND_URL } from '../../config';
 import styles from './Login.module.css';
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
+  const LOGIN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24시간
+
+  // 이미 로그인된 상태라면 로그인 화면을 건너뛰고 바로 팝업으로 이동
+  useEffect(() => {
+    const checkExistingLogin = async () => {
+      if (typeof chrome === 'undefined' || !chrome.storage) return;
+
+      try {
+        const { isLoggedIn, loginTime, jwtToken } = await chrome.storage.local.get([
+          'isLoggedIn',
+          'loginTime',
+          'jwtToken',
+        ]);
+
+        const loginTimeNumber = Number(loginTime ?? 0);
+        const hasValidSession =
+          Boolean(jwtToken) &&
+          Number.isFinite(loginTimeNumber) &&
+          Date.now() - loginTimeNumber <= LOGIN_EXPIRY_MS;
+
+        if (hasValidSession && Boolean(isLoggedIn)) {
+          window.location.href = './popup.html';
+        }
+      } catch (error) {
+        console.error('[histo] failed to read login state on login page:', error);
+      }
+    };
+
+    checkExistingLogin();
+  }, []);
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -52,9 +82,13 @@ export default function Login() {
       }
 
       // JWT 토큰과 사용자 정보를 storage에 저장
+      const loginTime = Date.now();
+      const expiryTime = loginTime + 24 * 60 * 60 * 1000; // 24시간 후
+
       await chrome.storage.local.set({
         isLoggedIn: true,
-        loginTime: Date.now(),
+        loginTime: loginTime,
+        expiryTime: expiryTime,
         jwtToken: backendData.accessToken, // 백엔드에서 발급한 JWT
         user: {
           userId: backendData.user.userId, // 백엔드 DB의 user ID
