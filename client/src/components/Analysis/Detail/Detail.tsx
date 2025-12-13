@@ -1,22 +1,84 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import styles from "./Detail.module.css";
-import useUsageStore from "../../../store/usageStore";
+import { useMemo, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import styles from './Detail.module.css';
+import useUsageStore from '../../../store/usageStore';
+import { BACKEND_URL } from '../../../config';
 import {
   Radar,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
   ResponsiveContainer,
-} from "recharts";
+  Legend,
+} from 'recharts';
 
-type PeriodType = "하루" | "일주일" | "한달";
+type PeriodType = '하루' | '일주일' | '한달';
 
 export default function Detail() {
   const navigate = useNavigate();
   const state = useUsageStore();
   const { categoryStats, totalTimeMinutes, loading, dataRangeDays = 0 } = state;
-  const [period, setPeriod] = useState<PeriodType>("하루");
+  const [period, setPeriod] = useState<PeriodType>('하루');
+  const [averageData, setAverageData] = useState<
+    Array<{ categoryName: string; averageTime: number }>
+  >([]);
+  const [loadingAverage, setLoadingAverage] = useState(true);
+
+  // 전체 사용자 평균 데이터 가져오기
+  useEffect(() => {
+    const fetchAverageData = async () => {
+      try {
+        setLoadingAverage(true);
+        const { jwtToken } = await new Promise<{ jwtToken?: string }>((resolve) => {
+          chrome.storage.local.get(['jwtToken'], (result) => resolve(result));
+        });
+
+        if (!jwtToken) {
+          console.log('[histo] no JWT token for average stats, using dummy data');
+          setAverageData(getDummyAverageData());
+          setLoadingAverage(false);
+          return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+
+        const response = await fetch(
+          `${BACKEND_URL}/history/stats/category/average?startDate=${today.toISOString()}&endDate=${tomorrow.toISOString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${jwtToken}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        setAverageData(data);
+      } catch (err) {
+        console.error('[histo] failed to fetch average data, using dummy data:', err);
+        setAverageData(getDummyAverageData());
+      } finally {
+        setLoadingAverage(false);
+      }
+    };
+
+    fetchAverageData();
+  }, []);
+
+  // 더미 평균 데이터 생성 (중심 60분 기준 골고루 분산)
+  const getDummyAverageData = () => [
+    { categoryName: '업무', averageTime: 3600 }, // 60분 (중심)
+    { categoryName: '소셜', averageTime: 3900 }, // 65분 (+8%)
+    { categoryName: '동영상', averageTime: 3300 }, // 55분 (-8%)
+    { categoryName: '뉴스', averageTime: 4200 }, // 70분 (+17%)
+    { categoryName: '쇼핑', averageTime: 3000 }, // 50분 (-17%)
+    { categoryName: '기타', averageTime: 2700 }, // 45분 (-25%)
+  ];
 
   // 기간별 필요 데이터 일수
   const requiredDays = {
@@ -27,7 +89,7 @@ export default function Detail() {
 
   // 데이터 충분성 체크
   const hasEnoughData = (periodType: PeriodType) => {
-    if (periodType === "하루") return true; // 하루는 항상 활성화
+    if (periodType === '하루') return true; // 하루는 항상 활성화
     return dataRangeDays >= requiredDays[periodType];
   };
 
@@ -38,31 +100,84 @@ export default function Detail() {
   };
 
   const radarData = useMemo(() => {
-    // 최대 12개 카테고리만 표시 (레이더 차트 가독성을 위해)
-    const maxCategories = 12;
+    const maxCategories = 6;
+    const allCategoryNames = [
+      '업무',
+      '소셜',
+      '동영상',
+      '뉴스',
+      '쇼핑',
+      '게임',
+      '쇼핑',
+      '교육',
+      '금융',
+      '건강',
+      '여행',
+      '기타',
+    ];
+
+    // 내 상위 카테고리
     const sortedCategories = [...categoryStats]
       .sort((a, b) => b.minutes - a.minutes)
       .slice(0, maxCategories);
 
-    // 데이터 정규화 (0-100 스케일로 변환)
-    const maxTime = Math.max(...sortedCategories.map((c) => c.minutes), 1);
-    const maxVisits = Math.max(...sortedCategories.map((c) => c.visits), 1);
+    const categoryMap = new Map<string, { myTime: number; avgTime: number }>();
 
-    return sortedCategories.map((cat) => ({
-      category: cat.name,
-      시간: Math.round((cat.minutes / maxTime) * 100),
-      원시시간: cat.minutes,
-      횟수: Math.round((cat.visits / maxVisits) * 100),
-      원시횟수: cat.visits,
+    // 내 데이터 추가 (분 단위)
+    sortedCategories.forEach((cat) => {
+      categoryMap.set(cat.name, {
+        myTime: cat.minutes,
+        avgTime: 0,
+      });
+    });
+
+    // 평균 데이터 추가 (초를 분으로 변환)
+    averageData.forEach((avg) => {
+      const existing = categoryMap.get(avg.categoryName);
+      const avgMinutes = avg.averageTime / 60;
+      if (existing) {
+        existing.avgTime = avgMinutes;
+      } else if (categoryMap.size < maxCategories) {
+        categoryMap.set(avg.categoryName, {
+          myTime: 0,
+          avgTime: avgMinutes,
+        });
+      }
+    });
+
+    // 6개 미만이면 랜덤 카테고리로 채우기
+    if (categoryMap.size < maxCategories) {
+      const existingCategories = Array.from(categoryMap.keys());
+      const availableCategories = allCategoryNames.filter(
+        (cat) => !existingCategories.includes(cat)
+      );
+
+      while (categoryMap.size < maxCategories && availableCategories.length > 0) {
+        const randomIndex = Math.floor(Math.random() * availableCategories.length);
+        const randomCategory = availableCategories[randomIndex];
+        availableCategories.splice(randomIndex, 1);
+
+        // 랜덤 카테고리에 더미 평균 데이터 추가
+        const randomAvgMinutes = Math.floor(Math.random() * 60) + 10; // 10-70분
+        categoryMap.set(randomCategory, {
+          myTime: 0,
+          avgTime: randomAvgMinutes,
+        });
+      }
+    }
+
+    return Array.from(categoryMap.entries()).map(([category, data]) => ({
+      category,
+      나: Math.round(data.myTime * 10) / 10,
+      평균: Math.round(data.avgTime * 10) / 10,
     }));
-  }, [categoryStats]);
+  }, [categoryStats, averageData]);
 
   const categoryDetails = useMemo(() => {
     return [...categoryStats].sort((a, b) => b.minutes - a.minutes);
   }, [categoryStats]);
 
-  if (loading)
-    return <div className={styles.contentCenter}>불러오는 중...</div>;
+  if (loading || loadingAverage) return <div className={styles.contentCenter}>불러오는 중...</div>;
 
   return (
     <div className={styles.detailPage}>
@@ -81,14 +196,14 @@ export default function Detail() {
       <div className={styles.periodSection}>
         <div className={styles.periodLabel}>분석 기간</div>
         <div className={styles.periodButtons}>
-          {(["하루", "일주일", "한달"] as PeriodType[]).map((p) => {
+          {(['하루', '일주일', '한달'] as PeriodType[]).map((p) => {
             const isAvailable = hasEnoughData(p);
             return (
               <button
                 key={p}
-                className={`${styles.periodButton} ${
-                  period === p ? styles.active : ""
-                } ${!isAvailable ? styles.disabled : ""}`}
+                className={`${styles.periodButton} ${period === p ? styles.active : ''} ${
+                  !isAvailable ? styles.disabled : ''
+                }`}
                 onClick={() => isAvailable && setPeriod(p)}
                 disabled={!isAvailable}
                 title={
@@ -98,17 +213,15 @@ export default function Detail() {
                 }
               >
                 {p}
-                {!isAvailable && (
-                  <span className={styles.disabledBadge}>데이터 부족</span>
-                )}
+                {!isAvailable && <span className={styles.disabledBadge}>데이터 부족</span>}
               </button>
             );
           })}
         </div>
         {dataRangeDays < 30 && (
           <div className={styles.dataRangeInfo}>
-            현재 {dataRangeDays}일치 데이터 수집됨 • 더 많은 데이터를 수집하면
-            추가 분석이 가능합니다
+            현재 {dataRangeDays}일치 데이터 수집됨 • 더 많은 데이터를 수집하면 추가 분석이
+            가능합니다
           </div>
         )}
       </div>
@@ -121,59 +234,42 @@ export default function Detail() {
 
       {/* 레이더 차트 */}
       <div className={styles.chartSection}>
-        <div className={styles.sectionTitle}>카테고리별 분석</div>
+        <div className={styles.sectionTitle}>카테고리별 비교</div>
         <div className={styles.chartSubtitle}>
-          시간과 방문 횟수 비교 (상위 {Math.min(radarData.length, 12)}개)
+          나의 사용 시간 vs 다른 사용자 평균 (분 단위, 상위 6개)
         </div>
         {radarData.length === 0 ? (
           <div className={styles.emptyChart}>데이터가 없습니다.</div>
         ) : (
           <>
-            <ResponsiveContainer width="100%" height={320}>
+            <ResponsiveContainer width='100%' height={320}>
               <RadarChart data={radarData}>
-                <PolarGrid stroke="#e0e0e0" strokeDasharray="3 3" />
+                <PolarGrid stroke='#e0e0e0' strokeDasharray='3 3' />
                 <PolarAngleAxis
-                  dataKey="category"
-                  tick={{ fill: "#666", fontSize: 11 }}
+                  dataKey='category'
+                  tick={{ fill: '#666', fontSize: 11 }}
                   tickLine={false}
                 />
                 <Radar
-                  name="시간"
-                  dataKey="시간"
-                  stroke="#7c63ff"
-                  fill="#7c63ff"
+                  name='나'
+                  dataKey='나'
+                  stroke='#7c63ff'
+                  fill='#7c63ff'
                   fillOpacity={0.5}
                   strokeWidth={2}
                 />
                 <Radar
-                  name="횟수"
-                  dataKey="횟수"
-                  stroke="#6ee7b7"
-                  fill="#6ee7b7"
+                  name='평균'
+                  dataKey='평균'
+                  stroke='#6ee7b7'
+                  fill='#6ee7b7'
                   fillOpacity={0.3}
                   strokeWidth={2}
                 />
+                <Legend />
               </RadarChart>
             </ResponsiveContainer>
-            <div className={styles.legend}>
-              <div className={styles.legendItem}>
-                <span
-                  className={styles.legendDot}
-                  style={{ backgroundColor: "#7c63ff" }}
-                ></span>
-                시간(분)
-              </div>
-              <div className={styles.legendItem}>
-                <span
-                  className={styles.legendDot}
-                  style={{ backgroundColor: "#6ee7b7" }}
-                ></span>
-                횟수
-              </div>
-            </div>
-            <div className={styles.chartNote}>
-              * 데이터는 상대적 비율로 정규화되어 표시됩니다
-            </div>
+            <div className={styles.chartNote}>* 단위: 분 • 상위 6개 카테고리 표시</div>
           </>
         )}
       </div>
@@ -190,9 +286,7 @@ export default function Detail() {
                 <div className={styles.categoryHeader}>
                   <span className={styles.categoryDot}></span>
                   <span className={styles.categoryName}>{cat.name}</span>
-                  <span className={styles.categoryTime}>
-                    {formatTime(cat.minutes)}
-                  </span>
+                  <span className={styles.categoryTime}>{formatTime(cat.minutes)}</span>
                 </div>
                 <div className={styles.categoryMeta}>{cat.visits}회 방문</div>
               </div>
