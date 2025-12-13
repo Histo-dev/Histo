@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import styles from "./Advice.module.css";
+import { useEffect, useState } from 'react';
+import { BACKEND_URL } from '../../../config';
+import styles from './Advice.module.css';
 
 // 일일 응답
 type DailyAdviceResponse = {
@@ -26,37 +27,33 @@ type WeeklyMonthlyAdviceResponse = {
 
 type AdviceResponse = DailyAdviceResponse | WeeklyMonthlyAdviceResponse;
 
-type PeriodType = "daily" | "weekly" | "monthly";
-
-const BACKEND_URL = "http://localhost:3000";
+type PeriodType = 'daily' | 'weekly' | 'monthly';
 
 const PERIOD_LABELS = {
-  daily: "일일",
-  weekly: "주간",
-  monthly: "월간",
+  daily: '일일',
+  weekly: '주간',
+  monthly: '월간',
 };
 
 export default function Advice() {
-  const [period, setPeriod] = useState<PeriodType>("daily");
+  const [period, setPeriod] = useState<PeriodType>('daily');
   const [adviceData, setAdviceData] = useState<AdviceResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     const fetchAdvice = async () => {
       try {
         setLoading(true);
-        setError("");
+        setError('');
 
         // JWT 토큰 가져오기
-        const { jwtToken } = await new Promise<{ jwtToken?: string }>(
-          (resolve) => {
-            chrome.storage.local.get(["jwtToken"], (result) => resolve(result));
-          }
-        );
+        const { jwtToken } = await new Promise<{ jwtToken?: string }>((resolve) => {
+          chrome.storage.local.get(['jwtToken'], (result) => resolve(result));
+        });
 
         if (!jwtToken) {
-          setError("로그인이 필요합니다.");
+          setError('로그인이 필요합니다.');
           setLoading(false);
           return;
         }
@@ -75,8 +72,8 @@ export default function Advice() {
         const data: AdviceResponse = await response.json();
         setAdviceData(data);
       } catch (err) {
-        console.error("[histo] failed to fetch advice:", err);
-        setError("조언을 불러오는 데 실패했습니다.");
+        console.error('[histo] failed to fetch advice:', err);
+        setError('조언을 불러오는 데 실패했습니다.');
       } finally {
         setLoading(false);
       }
@@ -107,10 +104,8 @@ export default function Advice() {
   }
 
   // 일일 응답 타입 체크
-  const isDailyResponse = (
-    data: AdviceResponse
-  ): data is DailyAdviceResponse => {
-    return "totalTime" in data;
+  const isDailyResponse = (data: AdviceResponse): data is DailyAdviceResponse => {
+    return 'totalTime' in data;
   };
 
   return (
@@ -119,21 +114,17 @@ export default function Advice() {
         <div className={styles.iconWrapper}>💡</div>
         <div>
           <h2 className={styles.title}>AI 조언</h2>
-          <p className={styles.subtitle}>
-            당신의 웹 사용 패턴을 분석한 맞춤 인사이트
-          </p>
+          <p className={styles.subtitle}>당신의 웹 사용 패턴을 분석한 맞춤 인사이트</p>
         </div>
       </div>
 
       {/* 기간 선택 */}
       <div className={styles.periodSection}>
         <div className={styles.periodButtons}>
-          {(["daily", "weekly", "monthly"] as PeriodType[]).map((p) => (
+          {(['daily', 'weekly', 'monthly'] as PeriodType[]).map((p) => (
             <button
               key={p}
-              className={`${styles.periodButton} ${
-                period === p ? styles.active : ""
-              }`}
+              className={`${styles.periodButton} ${period === p ? styles.active : ''}`}
               onClick={() => setPeriod(p)}
             >
               {PERIOD_LABELS[p]}
@@ -150,8 +141,7 @@ export default function Advice() {
             <div className={styles.statItem}>
               <span className={styles.statLabel}>총 사용 시간</span>
               <span className={styles.statValue}>
-                {Math.floor(adviceData.totalTime / 60)}시간{" "}
-                {adviceData.totalTime % 60}분
+                {Math.floor(adviceData.totalTime / 60)}시간 {adviceData.totalTime % 60}분
               </span>
             </div>
             <div className={styles.statItem}>
@@ -183,22 +173,17 @@ export default function Advice() {
                 <div className={styles.adviceData}>
                   <div className={styles.adviceDataItem}>
                     <span className={styles.adviceDataLabel}>카테고리</span>
-                    <span className={styles.adviceDataValue}>
-                      {item.category}
-                    </span>
+                    <span className={styles.adviceDataValue}>{item.category}</span>
                   </div>
                   <div className={styles.adviceDataItem}>
                     <span className={styles.adviceDataLabel}>사용 시간</span>
                     <span className={styles.adviceDataValue}>
-                      {Math.floor(item.data.time / 60)}시간{" "}
-                      {item.data.time % 60}분
+                      {Math.floor(item.data.time / 60)}시간 {item.data.time % 60}분
                     </span>
                   </div>
                   <div className={styles.adviceDataItem}>
                     <span className={styles.adviceDataLabel}>방문 횟수</span>
-                    <span className={styles.adviceDataValue}>
-                      {item.data.count}회
-                    </span>
+                    <span className={styles.adviceDataValue}>{item.data.count}회</span>
                   </div>
                 </div>
               </div>
@@ -208,9 +193,7 @@ export default function Advice() {
       ) : null}
 
       <div className={styles.footer}>
-        <p className={styles.footerText}>
-          💬 AI가 생성한 조언입니다. 참고용으로 활용해 주세요.
-        </p>
+        <p className={styles.footerText}>💬 AI가 생성한 조언입니다. 참고용으로 활용해 주세요.</p>
       </div>
     </div>
   );
