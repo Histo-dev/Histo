@@ -141,7 +141,8 @@ export default function Advice() {
             <div className={styles.statItem}>
               <span className={styles.statLabel}>총 사용 시간</span>
               <span className={styles.statValue}>
-                {Math.floor(adviceData.totalTime / 60)}시간 {adviceData.totalTime % 60}분
+                {Math.floor(adviceData.totalTime / 3600)}시간{' '}
+                {Math.floor((adviceData.totalTime % 3600) / 60)}분
               </span>
             </div>
             <div className={styles.statItem}>
@@ -178,7 +179,8 @@ export default function Advice() {
                   <div className={styles.adviceDataItem}>
                     <span className={styles.adviceDataLabel}>사용 시간</span>
                     <span className={styles.adviceDataValue}>
-                      {Math.floor(item.data.time / 60)}시간 {item.data.time % 60}분
+                      {Math.floor(item.data.time / 3600)}시간{' '}
+                      {Math.floor((item.data.time % 3600) / 60)}분
                     </span>
                   </div>
                   <div className={styles.adviceDataItem}>
