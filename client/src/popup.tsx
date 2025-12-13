@@ -25,14 +25,26 @@ function PopUpRoutes({ onRefresh }: { onRefresh: () => void }) {
     setIsLoading(true);
     const start = Date.now();
 
-    chrome.runtime.sendMessage({ action: "start-analysis" }, () => {
+    chrome.runtime.sendMessage({ action: "start-analysis" }, (response) => {
       const elapsed = Date.now() - start;
       const remaining = Math.max(0, MIN_LOADING_MS - elapsed);
+
       setTimeout(() => {
-        setIsLoading(false);
-        // Trigger data reload in UsageProvider
-        onRefresh();
-        navigate("/analysis/overview");
+        if (response?.ok) {
+          // Trigger data reload in UsageProvider
+          onRefresh();
+          // Give time for data to load before navigating
+          setTimeout(() => {
+            setIsLoading(false);
+            navigate("/analysis/overview");
+          }, 300);
+        } else {
+          // 에러 처리
+          console.error("[popup] analysis failed:", response?.error);
+          setIsLoading(false);
+          onRefresh();
+          navigate("/analysis/overview");
+        }
       }, remaining);
     });
   };

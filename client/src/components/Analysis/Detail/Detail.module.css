@@ -1,7 +1,6 @@
 .detailPage {
   padding: 20px;
-  min-height: 100vh;
-  margin-bottom: 10px;
+  padding-bottom: 80px;
 }
 
 /* 헤더 */
