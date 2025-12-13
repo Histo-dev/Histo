@@ -6,6 +6,7 @@ import { useLocation, useNavigate, Routes, Route } from "react-router-dom";
 import Overview from "./Overview/Overview";
 import TopN from "./TopN/TopN";
 import Detail from "./Detail/Detail";
+import Advice from "./Advice/Advice";
 
 type Props = {
   onBack?: () => void;
@@ -46,6 +47,7 @@ export default function Analysis({ onBack }: Props) {
       <Routes>
         <Route path="overview" element={<Overview />} />
         <Route path="topN" element={<TopN />} />
+        <Route path="advice" element={<Advice />} />
       </Routes>
     </div>
   );

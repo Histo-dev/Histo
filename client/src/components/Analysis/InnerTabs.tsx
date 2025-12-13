@@ -1,6 +1,6 @@
 import styles from "./InnerTabs.module.css";
 
-type TabKey = "overview" | "topN";
+type TabKey = "overview" | "topN" | "advice";
 
 type Props = {
   selected?: TabKey;
@@ -27,6 +27,16 @@ export default function InnerTabs({ selected = "overview", onSelect }: Props) {
         aria-selected={selected === "topN"}
       >
         Top3
+      </button>
+      <button
+        className={`${styles.tab} ${
+          selected === "advice" ? styles.active : ""
+        }`}
+        onClick={() => onSelect?.("advice")}
+        role="tab"
+        aria-selected={selected === "advice"}
+      >
+        💡 조언
       </button>
     </div>
   );
