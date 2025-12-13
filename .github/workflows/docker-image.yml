@@ -46,12 +46,28 @@ jobs:
 
             docker image prune -f
 
-            echo "Waiting for server to start..."
-            sleep 10
-            if curl -f http://localhost:8080/health; then
-              echo "✅ Deployment successful!"
-            else
-              echo "❌ Health check failed!"
-              docker logs histo-server --tail 50
-              exit 1
-            fi
+            for i in {1..30}; do
+              echo "Health check attempt $i/30..."
+              
+              if ! docker ps | grep -q histo-server; then
+                echo "❌ Container is not running!"
+                docker logs histo-server --tail 50
+                exit 1
+              fi
+              
+              if curl -f http://localhost:8080/health 2>/dev/null; then
+                echo "✅ Deployment successful!"
+                exit 0
+              fi
+              
+              sleep 2
+            done
+            
+            echo "❌ Health check failed after 60 seconds!"
+            echo "=== Container Status ==="
+            docker ps -a | grep histo-server
+            echo "=== Container Logs ==="
+            docker logs histo-server --tail 100
+            echo "=== Port Bindings ==="
+            docker port histo-server
+            exit 1
