@@ -1,5 +1,11 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { BACKEND_URL } from '../config';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
+import { BACKEND_URL } from "../config";
 
 export type SiteStat = {
   domain: string;
@@ -44,33 +50,33 @@ const demoState: UsageState = {
   totalVisits: 0,
   siteStats: [
     {
-      domain: 'facebook.com',
+      domain: "facebook.com",
       minutes: 120,
       visits: 5,
       lastVisited: Date.now(),
-      category: '소셜',
+      category: "소셜",
     },
     {
-      domain: 'youtube.com',
+      domain: "youtube.com",
       minutes: 85,
       visits: 3,
       lastVisited: Date.now(),
-      category: '동영상',
+      category: "동영상",
     },
     {
-      domain: 'news.example',
+      domain: "news.example",
       minutes: 45,
       visits: 2,
       lastVisited: Date.now(),
-      category: '뉴스',
+      category: "뉴스",
     },
   ],
   categoryStats: [
-    { name: '소셜', minutes: 120, visits: 5, sites: 1 },
-    { name: '동영상', minutes: 85, visits: 3, sites: 1 },
-    { name: '뉴스', minutes: 45, visits: 2, sites: 1 },
+    { name: "소셜", minutes: 120, visits: 5, sites: 1 },
+    { name: "동영상", minutes: 85, visits: 3, sites: 1 },
+    { name: "뉴스", minutes: 45, visits: 2, sites: 1 },
   ],
-  analysisState: 'demo',
+  analysisState: "demo",
   loading: false,
 };
 
@@ -91,17 +97,19 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
   try {
     // JWT 토큰 가져오기
     const { jwtToken } = await new Promise<{ jwtToken?: string }>((resolve) => {
-      chrome.storage.local.get(['jwtToken'], (result) => resolve(result));
+      chrome.storage.local.get(["jwtToken"], (result) => resolve(result));
     });
 
     if (!jwtToken) {
-      console.log('[histo] no JWT token, skip backend fetch');
+      console.log("[histo] no JWT token, skip backend fetch");
       return null;
     }
 
     // 로컬 siteStats, dailyHistory 함께 가져오기
     const localStorage = await new Promise<any>((resolve) => {
-      chrome.storage.local.get(['siteStats', 'dailyHistory'], (result) => resolve(result));
+      chrome.storage.local.get(["siteStats", "dailyHistory"], (result) =>
+        resolve(result)
+      );
     });
 
     // 카테고리 통계 가져오기
@@ -116,17 +124,20 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
     }
 
     const data = await response.json();
-    console.log('[histo] backend data:', data);
+    console.log("[histo] backend data:", data);
 
     // 백엔드 응답 형식: { categoryId, categoryName, totalTime, count }[]
     const categoryStats: CategoryStat[] = data.map((cat: any) => ({
-      name: cat.categoryName || '기타',
+      name: cat.categoryName || "기타",
       minutes: Math.round((cat.totalTime || 0) / 60), // 초 → 분
       visits: cat.count || 0,
       sites: 1, // 카테고리당 사이트 수는 별도 집계 필요
     }));
 
-    const totalTimeMinutes = categoryStats.reduce((sum, cat) => sum + cat.minutes, 0);
+    const totalTimeMinutes = categoryStats.reduce(
+      (sum, cat) => sum + cat.minutes,
+      0
+    );
     const totalVisits = categoryStats.reduce((sum, cat) => sum + cat.visits, 0);
 
     // 로컬 siteStats 변환
@@ -144,15 +155,15 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
       totalVisits,
       siteStats, // 로컬 데이터 사용
       categoryStats,
-      analysisState: 'backend',
+      analysisState: "backend",
       loading: false,
       dataRangeDays, // 데이터가 있는 날짜 수
     };
 
-    console.log('[histo] transformed backend data:', result);
+    console.log("[histo] transformed backend data:", result);
     return result;
   } catch (error) {
-    console.error('[histo] failed to fetch from backend:', error);
+    console.error("[histo] failed to fetch from backend:", error);
     return null;
   }
 };
@@ -163,20 +174,38 @@ const convertStorageToState = (storage: Record<string, any>): UsageState => {
   const dailyTotals = storage.dailyTotals ?? {};
   const dailyHistory = storage.dailyHistory ?? {};
 
+  console.log("[histo] convertStorageToState - dailyTotals:", dailyTotals);
+
   const siteStatsArray = Object.values(siteStats) as SiteStat[];
   const categoryStatsArray = Object.values(categoryStats) as CategoryStat[];
+
+  // siteStats에서 직접 계산 (dailyTotals가 비어있을 수 있음)
+  const totalTimeMinutes = Math.round(
+    siteStatsArray.reduce((sum, site) => sum + (site.minutes || 0), 0)
+  );
+  const totalSites = siteStatsArray.length;
+  const totalVisits = siteStatsArray.reduce(
+    (sum, site) => sum + (site.visits || 0),
+    0
+  );
+
+  console.log("[histo] calculated from siteStats:", {
+    totalTimeMinutes,
+    totalSites,
+    totalVisits,
+  });
 
   // 데이터 범위 계산
   const dates = Object.keys(dailyHistory);
   const dataRangeDays = dates.length;
 
   return {
-    totalTimeMinutes: dailyTotals.totalMinutes ?? 0,
-    totalSites: dailyTotals.totalSites ?? 0,
-    totalVisits: dailyTotals.totalVisits ?? 0,
+    totalTimeMinutes,
+    totalSites,
+    totalVisits,
     siteStats: siteStatsArray,
     categoryStats: categoryStatsArray,
-    analysisState: storage.analysisState ?? 'idle',
+    analysisState: storage.analysisState ?? "idle",
     loading: false,
     dailyHistory: dailyHistory,
     dataRangeDays,
@@ -194,42 +223,34 @@ export const UsageProvider = ({
 
   useEffect(() => {
     const loadData = async () => {
-      if (typeof chrome === 'undefined' || !chrome.runtime) {
+      if (typeof chrome === "undefined" || !chrome.runtime) {
         setState(demoState);
         return;
       }
 
       try {
-        // 1️⃣ 먼저 백엔드에서 데이터 가져오기 시도
-        const backendData = await fetchFromBackend();
-        console.log('[histo] fetchFromBackend result:', backendData);
-
-        if (backendData) {
-          console.log('[histo] ✅ using backend data', {
-            categories: backendData.categoryStats.length,
-            totalTime: backendData.totalTimeMinutes,
-            totalVisits: backendData.totalVisits,
-          });
-          setState(backendData);
-          return;
-        }
-
-        // 2️⃣ 백엔드 실패 시 로컬 스토리지 사용
-        console.log('[histo] falling back to local storage');
+        // 로컬 스토리지에서 데이터 가져오기 (대시보드용)
+        console.log("[histo] loading local storage data");
         const storageData = await new Promise<any>((resolve) => {
           chrome.storage.local.get(
-            ['siteStats', 'categoryStats', 'dailyTotals', 'analysisState', 'dailyHistory'],
+            [
+              "siteStats",
+              "categoryStats",
+              "dailyTotals",
+              "analysisState",
+              "dailyHistory",
+            ],
             (result) => {
               resolve(result);
             }
           );
         });
 
-        console.log('[histo] loaded from storage:', storageData);
+        console.log("[histo] loaded from storage:", storageData);
 
         // Background에 데이터 요청 (비동기)
         if (chrome.runtime?.sendMessage) {
-          chrome.runtime.sendMessage({ action: 'get-data' }, () => {
+          chrome.runtime.sendMessage({ action: "get-data" }, () => {
             if (chrome.runtime.lastError) {
               // 무시
             }
@@ -248,7 +269,7 @@ export const UsageProvider = ({
           setState(demoState);
         }
       } catch (err) {
-        console.error('Error loading data:', err);
+        console.error("Error loading data:", err);
         setState(demoState);
       }
     };
@@ -256,7 +277,9 @@ export const UsageProvider = ({
     loadData();
   }, [triggerRefresh]);
 
-  return <UsageContext.Provider value={state}>{children}</UsageContext.Provider>;
+  return (
+    <UsageContext.Provider value={state}>{children}</UsageContext.Provider>
+  );
 };
 
 export const useUsageStore = (): UsageState => {
@@ -266,5 +289,8 @@ export const useUsageStore = (): UsageState => {
   }
   return context;
 };
+
+// Detail 페이지에서 백엔드 데이터를 가져올 수 있도록 export
+export { fetchFromBackend };
 
 export default useUsageStore;
