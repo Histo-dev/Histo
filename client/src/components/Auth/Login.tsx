@@ -4,7 +4,6 @@ import styles from './Login.module.css';
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
-  const LOGIN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24시간
 
   // 이미 로그인된 상태라면 로그인 화면을 건너뛰고 바로 팝업으로 이동
   useEffect(() => {
@@ -12,23 +11,46 @@ export default function Login() {
       if (typeof chrome === 'undefined' || !chrome.storage) return;
 
       try {
-        const { isLoggedIn, loginTime, jwtToken } = await chrome.storage.local.get([
-          'isLoggedIn',
-          'loginTime',
-          'jwtToken',
-        ]);
+        const { jwtToken } = await chrome.storage.local.get(['jwtToken']);
 
-        const loginTimeNumber = Number(loginTime ?? 0);
-        const hasValidSession =
-          Boolean(jwtToken) &&
-          Number.isFinite(loginTimeNumber) &&
-          Date.now() - loginTimeNumber <= LOGIN_EXPIRY_MS;
+        if (!jwtToken) {
+          return; // 토큰이 없으면 로그인 화면 표시
+        }
 
-        if (hasValidSession && Boolean(isLoggedIn)) {
+        // 서버에 토큰 유효성 검증 요청
+        const response = await fetch(`${BACKEND_URL}/auth/verify`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${jwtToken}`,
+          },
+        });
+
+        if (response.ok) {
+          // 토큰이 유효하면 팝업으로 이동
           window.location.href = './popup.html';
+        } else {
+          // 토큰이 유효하지 않으면 로컬 스토리지 정리
+          await chrome.storage.local.remove([
+            'isLoggedIn',
+            'loginTime',
+            'expiryTime',
+            'jwtToken',
+            'user',
+          ]);
+          console.log('[histo] Invalid token, cleared storage');
         }
       } catch (error) {
-        console.error('[histo] failed to read login state on login page:', error);
+        console.error('[histo] failed to verify token:', error);
+        // 검증 실패 시 로컬 스토리지 정리
+        if (chrome.storage) {
+          await chrome.storage.local.remove([
+            'isLoggedIn',
+            'loginTime',
+            'expiryTime',
+            'jwtToken',
+            'user',
+          ]);
+        }
       }
     };
 
