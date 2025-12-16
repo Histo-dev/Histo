@@ -244,3 +244,18 @@
   min-height: 200px;
   color: #999;
 }
+
+.spinner {
+  display: block;
+  transform-origin: center;
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
