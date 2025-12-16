@@ -206,8 +206,34 @@ export default function Detail() {
     return [...categoryStats].sort((a, b) => b.minutes - a.minutes);
   }, [categoryStats]);
 
-  if (loading || loadingAverage)
-    return <div className={styles.contentCenter}>불러오는 중...</div>;
+  if (loading || loadingAverage) {
+    return (
+      <div className={styles.contentCenter}>
+        <svg
+          className={styles.spinner}
+          width="50"
+          height="50"
+          viewBox="0 0 50 50"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <circle
+            cx="25"
+            cy="25"
+            r="20"
+            fill="none"
+            stroke="#312c85"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray="90, 150"
+            strokeDashoffset="0"
+          />
+        </svg>
+        <div style={{ marginTop: 16, color: "#6b7280", fontSize: 14 }}>
+          데이터를 불러오는 중...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.detailPage}>
