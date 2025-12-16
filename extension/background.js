@@ -64,7 +64,8 @@
       if (dailyTotals && dailyTotals.totalMinutes > 0) {
         await archiveDailyData(dailyTotals);
       }
-      await syncToBackend().catch(
+      console.log("[histo] syncing data to backend before daily reset");
+      await syncToBackend(true).catch(
         (err) => console.error("[histo] failed to sync before daily reset:", err)
       );
       await storageSet({
