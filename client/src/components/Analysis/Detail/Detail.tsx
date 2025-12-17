@@ -24,24 +24,24 @@ export default function Detail() {
   >([]);
   const [loadingAverage, setLoadingAverage] = useState(true);
 
-  // 백엔드에서 데이터 가져오기 (Detail 페이지 전용)
+  // 백엔드에서 데이터 가져오기 (period에 따라 변경)
   useEffect(() => {
     const loadBackendData = async () => {
       setLoading(true);
-      const data = await fetchFromBackend();
+      const days = period === "하루" ? 1 : period === "일주일" ? 7 : 30;
+      const data = await fetchFromBackend(days);
       if (data) {
         setBackendData(data);
       }
       setLoading(false);
     };
     loadBackendData();
-  }, []);
+  }, [period]);
 
   const categoryStats = backendData?.categoryStats || [];
   const totalTimeMinutes = backendData?.totalTimeMinutes || 0;
-  const dataRangeDays = backendData?.dataRangeDays || 0;
 
-  // 전체 사용자 평균 데이터 가져오기
+  // 전체 사용자 평균 데이터 가져오기 (period에 따라 변경)
   useEffect(() => {
     const fetchAverageData = async () => {
       try {
@@ -61,12 +61,16 @@ export default function Detail() {
           return;
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        // period에 따라 날짜 범위 설정
+        const endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+        const startDate = new Date();
+        const days = period === "하루" ? 1 : period === "일주일" ? 7 : 30;
+        startDate.setDate(startDate.getDate() - (days - 1));
+        startDate.setHours(0, 0, 0, 0);
 
         const response = await fetch(
-          `${BACKEND_URL}/history/stats/category/average?startDate=${today.toISOString()}&endDate=${tomorrow.toISOString()}`,
+          `${BACKEND_URL}/history/stats/category/average?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`,
           {
             headers: {
               Authorization: `Bearer ${jwtToken}`,
@@ -92,7 +96,7 @@ export default function Detail() {
     };
 
     fetchAverageData();
-  }, []);
+  }, [period]);
 
   // 더미 평균 데이터 생성 (중심 60분 기준 골고루 분산)
   const getDummyAverageData = () => [
@@ -104,17 +108,21 @@ export default function Detail() {
     { categoryName: "기타", averageTime: 2700 }, // 45분 (-25%)
   ];
 
-  // 기간별 필요 데이터 일수
-  const requiredDays = {
-    하루: 0, // 하루는 무조건 활성화
-    일주일: 7,
-    한달: 30,
+  // 카테고리별 색상 매핑
+  const categoryColors: Record<string, string> = {
+    업무: "#4f39f6",
+    소셜: "#06b6d4",
+    엔터테인먼트: "#f59e0b",
+    쇼핑: "#ec4899",
+    뉴스: "#10b981",
+    교육: "#8b5cf6",
+    개발: "#3b82f6",
+    커뮤니티: "#14b8a6",
+    기타: "#6b7280",
   };
 
-  // 데이터 충분성 체크
-  const hasEnoughData = (periodType: PeriodType) => {
-    if (periodType === "하루") return true; // 하루는 항상 활성화
-    return dataRangeDays >= requiredDays[periodType];
+  const getCategoryColor = (categoryName: string): string => {
+    return categoryColors[categoryName] || "#6b7280"; // 기본 회색
   };
 
   const formatTime = (mins: number) => {
@@ -253,38 +261,22 @@ export default function Detail() {
         <div className={styles.periodLabel}>분석 기간</div>
         <div className={styles.periodButtons}>
           {(["하루", "일주일", "한달"] as PeriodType[]).map((p) => {
-            const isAvailable = hasEnoughData(p);
             return (
               <button
                 key={p}
                 className={`${styles.periodButton} ${
                   period === p ? styles.active : ""
-                } ${!isAvailable ? styles.disabled : ""}`}
-                onClick={() => isAvailable && setPeriod(p)}
-                disabled={!isAvailable}
-                title={
-                  !isAvailable
-                    ? `${requiredDays[p]}일 이상의 데이터가 필요합니다 (현재: ${dataRangeDays}일)`
-                    : undefined
-                }
+                }`}
+                onClick={() => setPeriod(p)}
               >
                 {p}
-                {!isAvailable && (
-                  <span className={styles.disabledBadge}>데이터 부족</span>
-                )}
               </button>
             );
           })}
         </div>
-        {dataRangeDays < 30 && (
-          <div className={styles.dataRangeInfo}>
-            현재 {dataRangeDays}일치 데이터 수집됨 • 더 많은 데이터를 수집하면
-            추가 분석이 가능합니다
-          </div>
-        )}
       </div>
 
-      {/* 총 사용 시간 */}
+      {/* 비교 차트 */}
       <div className={styles.totalTimeCard}>
         <div className={styles.totalLabel}>{period} 총 사용 시간</div>
         <div className={styles.totalValue}>{formatTime(totalTimeMinutes)}</div>
@@ -344,7 +336,10 @@ export default function Detail() {
             {categoryDetails.map((cat) => (
               <div key={cat.name} className={styles.categoryItem}>
                 <div className={styles.categoryHeader}>
-                  <span className={styles.categoryDot}></span>
+                  <span
+                    className={styles.categoryDot}
+                    style={{ backgroundColor: getCategoryColor(cat.name) }}
+                  ></span>
                   <span className={styles.categoryName}>{cat.name}</span>
                   <span className={styles.categoryTime}>
                     {formatTime(cat.minutes)}

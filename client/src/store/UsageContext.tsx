@@ -93,7 +93,7 @@ const defaultState: UsageState = {
 const UsageContext = createContext<UsageState>(defaultState);
 
 // 백엔드 API에서 데이터 가져오기
-const fetchFromBackend = async (): Promise<UsageState | null> => {
+const fetchFromBackend = async (days?: number): Promise<UsageState | null> => {
   try {
     // JWT 토큰 가져오기
     const { jwtToken } = await new Promise<{ jwtToken?: string }>((resolve) => {
@@ -112,8 +112,23 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
       );
     });
 
-    // 카테고리 통계 가져오기
-    const response = await fetch(`${BACKEND_URL}/history/stats/category`, {
+    // 기간 설정 (days 파라미터로 제어)
+    const endDate = new Date();
+    endDate.setHours(23, 59, 59, 999);
+    const startDate = new Date();
+    if (days) {
+      startDate.setDate(startDate.getDate() - (days - 1));
+    }
+    startDate.setHours(0, 0, 0, 0);
+
+    // 카테고리 통계 가져오기 (기간 파라미터 추가)
+    const url = new URL(`${BACKEND_URL}/history/stats/category`);
+    if (days) {
+      url.searchParams.set("startDate", startDate.toISOString());
+      url.searchParams.set("endDate", endDate.toISOString());
+    }
+
+    const response = await fetch(url.toString(), {
       headers: {
         Authorization: `Bearer ${jwtToken}`,
       },
@@ -144,10 +159,16 @@ const fetchFromBackend = async (): Promise<UsageState | null> => {
     const siteStatsObj = localStorage?.siteStats || {};
     const siteStats = Object.values(siteStatsObj) as SiteStat[];
 
-    // 데이터 범위 계산 (로컬 스토리지에서 가져오기)
-    const dailyHistory = localStorage?.dailyHistory || {};
-    const dates = Object.keys(dailyHistory);
-    const dataRangeDays = dates.length;
+    // 데이터 범위 계산
+    // days 파라미터가 있으면 그것을 사용, 없으면 로컬 dailyHistory 기반
+    let dataRangeDays = 0;
+    if (days) {
+      dataRangeDays = days;
+    } else {
+      const dailyHistory = localStorage?.dailyHistory || {};
+      const dates = Object.keys(dailyHistory);
+      dataRangeDays = dates.length;
+    }
 
     const result = {
       totalTimeMinutes,
