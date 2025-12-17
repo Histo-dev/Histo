@@ -108,6 +108,23 @@ export default function Detail() {
     { categoryName: "기타", averageTime: 2700 }, // 45분 (-25%)
   ];
 
+  // 카테고리별 색상 매핑
+  const categoryColors: Record<string, string> = {
+    업무: "#4f39f6",
+    소셜: "#06b6d4",
+    엔터테인먼트: "#f59e0b",
+    쇼핑: "#ec4899",
+    뉴스: "#10b981",
+    교육: "#8b5cf6",
+    개발: "#3b82f6",
+    커뮤니티: "#14b8a6",
+    기타: "#6b7280",
+  };
+
+  const getCategoryColor = (categoryName: string): string => {
+    return categoryColors[categoryName] || "#6b7280"; // 기본 회색
+  };
+
   const formatTime = (mins: number) => {
     const hours = Math.floor(mins / 60);
     const minutes = Math.round(mins % 60);
@@ -319,7 +336,10 @@ export default function Detail() {
             {categoryDetails.map((cat) => (
               <div key={cat.name} className={styles.categoryItem}>
                 <div className={styles.categoryHeader}>
-                  <span className={styles.categoryDot}></span>
+                  <span
+                    className={styles.categoryDot}
+                    style={{ backgroundColor: getCategoryColor(cat.name) }}
+                  ></span>
                   <span className={styles.categoryName}>{cat.name}</span>
                   <span className={styles.categoryTime}>
                     {formatTime(cat.minutes)}

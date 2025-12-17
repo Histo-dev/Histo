@@ -208,8 +208,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #7c63ff;
   display: inline-block;
+  /* 색상은 인라인 스타일로 동적 적용 */
 }
 .categoryName {
   font-size: 14px;
