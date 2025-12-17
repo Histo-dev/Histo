@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { History } from '../../entities/history.entity';
-import { CreateHistoryDto } from './dto/create-history.dto';
-import { HistoryQueryDto } from './dto/history-query.dto';
-import { HistoryResponseDto } from './dto/history-response.dto';
-import { ClassificationService } from '../ml/classification.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from "typeorm";
+import { History } from "../../entities/history.entity";
+import { CreateHistoryDto } from "./dto/create-history.dto";
+import { HistoryQueryDto } from "./dto/history-query.dto";
+import { HistoryResponseDto } from "./dto/history-response.dto";
+import { ClassificationService } from "../ml/classification.service";
 
 @Injectable()
 export class HistoryService {
@@ -18,7 +18,10 @@ export class HistoryService {
   /**
    * 히스토리 저장 (자동 카테고리 분류)
    */
-  async create(createHistoryDto: CreateHistoryDto, userId: string): Promise<History> {
+  async create(
+    createHistoryDto: CreateHistoryDto,
+    userId: string
+  ): Promise<History> {
     // ML로 카테고리 자동 분류
     const classification = await this.classificationService.classifyPage({
       url: createHistoryDto.url,
@@ -33,7 +36,7 @@ export class HistoryService {
       url: createHistoryDto.url,
       title: createHistoryDto.title,
       useTime: createHistoryDto.useTime || 0,
-      domain: domain || '',
+      domain: domain || "",
       categoryId: classification.categoryId,
       visitedAt: new Date(),
     });
@@ -44,21 +47,38 @@ export class HistoryService {
   /**
    * 여러 히스토리 일괄 저장
    */
-  async createBatch(histories: CreateHistoryDto[], userId: string): Promise<History[]> {
+  async createBatch(
+    histories: CreateHistoryDto[],
+    userId: string
+  ): Promise<History[]> {
     const results: History[] = [];
 
     for (const historyDto of histories) {
       try {
+        // visitedAt이 없으면 현재 시간 사용
+        const visitedAt = historyDto.visitedAt
+          ? new Date(historyDto.visitedAt)
+          : new Date();
+
+        // 해당 visitedAt의 날짜 범위 계산
+        const dayStart = new Date(visitedAt);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        // 같은 날짜 + URL + title로 중복 체크
         const existingHistory = await this.historyRepository.findOne({
           where: {
             url: historyDto.url,
             title: historyDto.title,
             userId: userId,
+            visitedAt: Between(dayStart, dayEnd),
           },
         });
         if (existingHistory) {
+          // 기존 히스토리가 있으면 사용 시간 누적
           existingHistory.useTime += historyDto.useTime || 0;
-          existingHistory.visitedAt = new Date(); // 마지막 방문 시간 업데이트
+          existingHistory.visitedAt = visitedAt; // 최신 방문 시간으로 업데이트
           await this.historyRepository.save(existingHistory);
           results.push(existingHistory);
         } else {
@@ -88,8 +108,8 @@ export class HistoryService {
         userId,
         visitedAt: Between(today, tomorrow),
       },
-      relations: ['category'],
-      order: { visitedAt: 'DESC' },
+      relations: ["category"],
+      order: { visitedAt: "DESC" },
     });
 
     return histories.map((history) => this.toResponseDto(history));
@@ -99,7 +119,14 @@ export class HistoryService {
    * 히스토리 조회 (필터링)
    */
   async findAll(query: HistoryQueryDto): Promise<HistoryResponseDto[]> {
-    const { userId, categoryId, startDate, endDate, limit = 50, offset = 0 } = query;
+    const {
+      userId,
+      categoryId,
+      startDate,
+      endDate,
+      limit = 50,
+      offset = 0,
+    } = query;
 
     const whereCondition: any = {};
 
@@ -113,7 +140,10 @@ export class HistoryService {
 
     // 날짜 필터
     if (startDate && endDate) {
-      whereCondition.visitedAt = Between(new Date(startDate), new Date(endDate));
+      whereCondition.visitedAt = Between(
+        new Date(startDate),
+        new Date(endDate)
+      );
     } else if (startDate) {
       whereCondition.visitedAt = MoreThanOrEqual(new Date(startDate));
     } else if (endDate) {
@@ -122,8 +152,8 @@ export class HistoryService {
 
     const histories = await this.historyRepository.find({
       where: whereCondition,
-      relations: ['category'],
-      order: { visitedAt: 'DESC' },
+      relations: ["category"],
+      order: { visitedAt: "DESC" },
       take: limit,
       skip: offset,
     });
@@ -137,7 +167,7 @@ export class HistoryService {
   async findOne(id: string): Promise<History> {
     const history = await this.historyRepository.findOne({
       where: { id },
-      relations: ['category', 'user'],
+      relations: ["category", "user"],
     });
 
     if (!history) {
@@ -173,7 +203,7 @@ export class HistoryService {
   ): Promise<Array<{ domain: string; count: number; totalTime: number }>> {
     const histories = await this.historyRepository.find({
       where: { userId },
-      select: ['url', 'useTime'],
+      select: ["url", "useTime"],
     });
 
     // 도메인별 집계
@@ -209,7 +239,7 @@ export class HistoryService {
   ): Promise<Array<{ domain: string; count: number; totalTime: number }>> {
     const histories = await this.historyRepository.find({
       where: { userId },
-      select: ['url', 'useTime'],
+      select: ["url", "useTime"],
     });
 
     const domainStats = new Map<string, { count: number; totalTime: number }>();
@@ -243,7 +273,12 @@ export class HistoryService {
     startDate?: Date,
     endDate?: Date
   ): Promise<
-    Array<{ categoryId: string; categoryName: string; totalTime: number; count: number }>
+    Array<{
+      categoryId: string;
+      categoryName: string;
+      totalTime: number;
+      count: number;
+    }>
   > {
     const whereCondition: any = { userId };
 
@@ -257,7 +292,7 @@ export class HistoryService {
 
     const histories = await this.historyRepository.find({
       where: whereCondition,
-      relations: ['category'],
+      relations: ["category"],
     });
 
     // 카테고리별 집계
@@ -307,7 +342,7 @@ export class HistoryService {
 
     const histories = await this.historyRepository.find({
       where: whereCondition,
-      relations: ['category'],
+      relations: ["category"],
     });
 
     // 카테고리별 사용자별 집계
@@ -335,14 +370,14 @@ export class HistoryService {
 
     // 유저가 1명 이하면 더미 데이터 반환 (중심 60분 기준 골고루 분산)
     if (uniqueUsers.size <= 1) {
-      console.log('[histo] only 1 or no user data, returning dummy average');
+      console.log("[histo] only 1 or no user data, returning dummy average");
       return [
-        { categoryName: '업무', averageTime: 3600 }, // 60분 (중심)
-        { categoryName: '소셜', averageTime: 3900 }, // 65분 (+8%)
-        { categoryName: '동영상', averageTime: 3300 }, // 55분 (-8%)
-        { categoryName: '뉴스', averageTime: 4200 }, // 70분 (+17%)
-        { categoryName: '쇼핑', averageTime: 3000 }, // 50분 (-17%)
-        { categoryName: '기타', averageTime: 2700 }, // 45분 (-25%)
+        { categoryName: "업무", averageTime: 3600 }, // 60분 (중심)
+        { categoryName: "소셜", averageTime: 3900 }, // 65분 (+8%)
+        { categoryName: "동영상", averageTime: 3300 }, // 55분 (-8%)
+        { categoryName: "뉴스", averageTime: 4200 }, // 70분 (+17%)
+        { categoryName: "쇼핑", averageTime: 3000 }, // 50분 (-17%)
+        { categoryName: "기타", averageTime: 2700 }, // 45분 (-25%)
       ];
     }
 
@@ -354,7 +389,10 @@ export class HistoryService {
       const sampleHistory = histories.find((h) => h.categoryId === categoryId);
       if (!sampleHistory?.category) continue;
 
-      const totalTime = Array.from(userTimes.values()).reduce((sum, time) => sum + time, 0);
+      const totalTime = Array.from(userTimes.values()).reduce(
+        (sum, time) => sum + time,
+        0
+      );
       const userCount = userTimes.size;
       const averageTime = userCount > 0 ? Math.round(totalTime / userCount) : 0;
 
@@ -367,12 +405,12 @@ export class HistoryService {
     // 데이터가 없을 경우 더미 데이터 반환 (중심 60분 기준 골고루 분산)
     if (result.length === 0) {
       return [
-        { categoryName: '업무', averageTime: 3600 }, // 60분 (중심)
-        { categoryName: '소셜', averageTime: 3900 }, // 65분 (+8%)
-        { categoryName: '동영상', averageTime: 3300 }, // 55분 (-8%)
-        { categoryName: '뉴스', averageTime: 4200 }, // 70분 (+17%)
-        { categoryName: '쇼핑', averageTime: 3000 }, // 50분 (-17%)
-        { categoryName: '기타', averageTime: 2700 }, // 45분 (-25%)
+        { categoryName: "업무", averageTime: 3600 }, // 60분 (중심)
+        { categoryName: "소셜", averageTime: 3900 }, // 65분 (+8%)
+        { categoryName: "동영상", averageTime: 3300 }, // 55분 (-8%)
+        { categoryName: "뉴스", averageTime: 4200 }, // 70분 (+17%)
+        { categoryName: "쇼핑", averageTime: 3000 }, // 50분 (-17%)
+        { categoryName: "기타", averageTime: 2700 }, // 45분 (-25%)
       ];
     }
 
@@ -387,7 +425,9 @@ export class HistoryService {
     try {
       // 프로토콜이 없으면 https://를 추가
       const urlWithProtocol =
-        url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+        url.startsWith("http://") || url.startsWith("https://")
+          ? url
+          : `https://${url}`;
 
       const parsedUrl = new URL(urlWithProtocol);
       return parsedUrl.hostname;
@@ -410,7 +450,7 @@ export class HistoryService {
       meta: history.meta,
       useTime: history.useTime,
       visitedAt: history.visitedAt,
-      domain: history.domain || '',
+      domain: history.domain || "",
       category: history.category
         ? {
             id: history.category.id,
