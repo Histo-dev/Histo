@@ -6,8 +6,12 @@
   var CURRENT_SESSION_KEY = "currentSession";
   var BACKEND_URL = "http://localhost:3000".replace(/\/$/, "");
   var randomId = () => crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
-  var storageGet = (keys) => new Promise((resolve) => chrome.storage.local.get(keys ?? null, (res) => resolve(res)));
-  var storageSet = (data) => new Promise((resolve) => chrome.storage.local.set(data, () => resolve()));
+  var storageGet = (keys) => new Promise(
+    (resolve) => chrome.storage.local.get(keys ?? null, (res) => resolve(res))
+  );
+  var storageSet = (data) => new Promise(
+    (resolve) => chrome.storage.local.set(data, () => resolve())
+  );
   var getDomain = (url) => {
     try {
       return new URL(url).hostname.replace(/^www\./, "");
@@ -39,7 +43,8 @@
     const data = await storageGet({ sessions: [] });
     const sessions = data.sessions ?? [];
     sessions.push(session);
-    if (sessions.length > MAX_SESSIONS) sessions.splice(0, sessions.length - MAX_SESSIONS);
+    if (sessions.length > MAX_SESSIONS)
+      sessions.splice(0, sessions.length - MAX_SESSIONS);
     await storageSet({ sessions });
   };
   var archiveDailyData = async (dailyTotal) => {
@@ -64,7 +69,8 @@
       if (dailyTotals && dailyTotals.totalMinutes > 0) {
         await archiveDailyData(dailyTotals);
       }
-      await syncToBackend().catch(
+      console.log("[histo] syncing data to backend before daily reset");
+      await syncToBackend(true).catch(
         (err) => console.error("[histo] failed to sync before daily reset:", err)
       );
       await storageSet({
@@ -118,7 +124,9 @@
             return null;
           }
           if (!urlObj.hostname || urlObj.hostname === "") {
-            console.warn(`[histo] skipping URL with no hostname: ${session.url}`);
+            console.warn(
+              `[histo] skipping URL with no hostname: ${session.url}`
+            );
             return null;
           }
           const urlString = session.url.trim();
@@ -129,16 +137,22 @@
           }
           const urlPattern = /^(?:http|https):\/\/(?:(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost)(?::\d{2,5})?(?:\/[^\s]*)?$/i;
           if (!urlPattern.test(urlString)) {
-            console.warn(`[histo] URL failed strict validation: ${session.url}`);
+            console.warn(
+              `[histo] URL failed strict validation: ${session.url}`
+            );
             return null;
           }
           return {
             url: urlString,
             title: session.domain || urlObj.hostname,
-            useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0
+            useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0,
+            visitedAt: new Date(session.start).toISOString()
           };
         } catch (err) {
-          console.warn(`[histo] invalid URL at index ${index}, skipping: ${session.url}`, err);
+          console.warn(
+            `[histo] invalid URL at index ${index}, skipping: ${session.url}`,
+            err
+          );
           return null;
         }
       }).filter((h) => h !== null);
@@ -152,9 +166,13 @@
       for (let i = 0; i < histories.length; i += BATCH_SIZE) {
         batches.push(histories.slice(i, i + BATCH_SIZE));
       }
-      console.log(`[histo] split into ${batches.length} batches, sending in parallel...`);
+      console.log(
+        `[histo] split into ${batches.length} batches, sending in parallel...`
+      );
       const batchPromises = batches.map(async (batch, i) => {
-        console.log(`[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`);
+        console.log(
+          `[histo] sending batch ${i + 1}/${batches.length} (${batch.length} items)...`
+        );
         const response = await fetch(`${BACKEND_URL}/history/batch`, {
           method: "POST",
           headers: {
@@ -166,15 +184,22 @@
         if (!response.ok) {
           const errorText = await response.text();
           if (response.status === 400) {
-            console.error(`[histo] batch ${i + 1} validation failed. Sample URLs:`);
+            console.error(
+              `[histo] batch ${i + 1} validation failed. Sample URLs:`
+            );
             batch.slice(0, 10).forEach((h, idx) => {
               console.log(`  [${idx}] ${h.url}`);
             });
           }
-          throw new Error(`HTTP ${response.status} on batch ${i + 1}: ${errorText}`);
+          throw new Error(
+            `HTTP ${response.status} on batch ${i + 1}: ${errorText}`
+          );
         }
         const result = await response.json();
-        console.log(`[histo] batch ${i + 1}/${batches.length} successful:`, result);
+        console.log(
+          `[histo] batch ${i + 1}/${batches.length} successful:`,
+          result
+        );
         return result;
       });
       await Promise.all(batchPromises);
@@ -188,13 +213,15 @@
   var categorize = (domain, title, categoryMap) => {
     if (categoryMap?.[domain]) return categoryMap[domain];
     const t = `${domain} ${title ?? ""}`.toLowerCase();
-    if (t.includes("youtube") || t.includes("netflix") || t.includes("video")) return "\uB3D9\uC601\uC0C1";
+    if (t.includes("youtube") || t.includes("netflix") || t.includes("video"))
+      return "\uB3D9\uC601\uC0C1";
     if (t.includes("facebook") || t.includes("instagram") || t.includes("twitter") || t.includes("x.com"))
       return "\uC18C\uC15C";
     if (t.includes("docs") || t.includes("notion") || t.includes("github") || t.includes("gitlab") || t.includes("bitbucket") || t.includes("stackoverflow") || t.includes("jira") || t.includes("slack") || t.includes("vscode"))
       return "\uC5C5\uBB34";
     if (t.includes("news")) return "\uB274\uC2A4";
-    if (t.includes("shopping") || t.includes("shop") || t.includes("store")) return "\uC1FC\uD551";
+    if (t.includes("shopping") || t.includes("shop") || t.includes("store"))
+      return "\uC1FC\uD551";
     return "\uAE30\uD0C0";
   };
   var aggregateAndStore = async () => {
@@ -204,7 +231,10 @@
       if (!currentSession) {
         currentSession = await loadPersistedCurrentSession();
         if (currentSession) {
-          console.log("[histo] restored in-progress session from storage", currentSession.domain);
+          console.log(
+            "[histo] restored in-progress session from storage",
+            currentSession.domain
+          );
         }
       }
       const {
@@ -214,14 +244,23 @@
         siteStats: existingSiteStats = {},
         categoryStats: existingCategoryStats = {},
         processedSessionIds = []
-      } = await storageGet(["sessions", "visits", "categoryMap", "siteStats", "categoryStats", "processedSessionIds"]);
+      } = await storageGet([
+        "sessions",
+        "visits",
+        "categoryMap",
+        "siteStats",
+        "categoryStats",
+        "processedSessionIds"
+      ]);
       console.log("[histo] loaded data:", {
         sessionsCount: sessions?.length || 0,
         processedCount: processedSessionIds?.length || 0,
         siteStatsCount: Object.keys(existingSiteStats || {}).length
       });
       const currentSessionIds = new Set(sessions.map((s) => s.id));
-      const validProcessedIds = (processedSessionIds || []).filter((id) => currentSessionIds.has(id));
+      const validProcessedIds = (processedSessionIds || []).filter(
+        (id) => currentSessionIds.has(id)
+      );
       if (validProcessedIds.length < (processedSessionIds?.length || 0)) {
         console.log(
           "[histo] trimmed processedIds:",
@@ -258,7 +297,9 @@
         });
         return;
       }
-      const siteStats = JSON.parse(JSON.stringify(existingSiteStats || {}));
+      const siteStats = JSON.parse(
+        JSON.stringify(existingSiteStats || {})
+      );
       const categoryStats = JSON.parse(
         JSON.stringify(existingCategoryStats || {})
       );
@@ -291,10 +332,18 @@
         }
         siteStats[domain].minutes += minutes;
         siteStats[domain].visits += 1;
-        siteStats[domain].lastVisited = Math.max(siteStats[domain].lastVisited, s.end ?? s.start);
-        const cat = categorize(domain, s.url, categoryMap);
+        siteStats[domain].lastVisited = Math.max(
+          siteStats[domain].lastVisited,
+          s.end ?? s.start
+        );
+        const cat = categorize(
+          domain,
+          s.url,
+          categoryMap
+        );
         siteStats[domain].category = cat;
-        if (!categoryStats[cat]) categoryStats[cat] = { name: cat, minutes: 0, visits: 0, sites: 0 };
+        if (!categoryStats[cat])
+          categoryStats[cat] = { name: cat, minutes: 0, visits: 0, sites: 0 };
         categoryStats[cat].minutes += minutes;
         categoryStats[cat].visits += 1;
         newProcessedIds.push(s.id);
@@ -327,7 +376,9 @@
       });
       Object.values(categoryStats).forEach((c) => {
         c.minutes = Math.round(c.minutes * 10) / 10;
-        c.sites = Object.values(siteStats).filter((s) => s.category === c.name).length;
+        c.sites = Object.values(siteStats).filter(
+          (s) => s.category === c.name
+        ).length;
       });
       const finalCategoryStats = {};
       Object.values(siteStats).forEach((s) => {
@@ -344,7 +395,9 @@
         finalCategoryStats[s.category].visits += s.visits || 0;
       });
       Object.values(finalCategoryStats).forEach((c) => {
-        c.sites = Object.values(siteStats).filter((s) => s.category === c.name).length;
+        c.sites = Object.values(siteStats).filter(
+          (s) => s.category === c.name
+        ).length;
       });
       const dailyTotals = {
         date: DAY_KEY(),
@@ -422,17 +475,22 @@
         ts: Date.now(),
         source: "tab_update"
       }).catch(console.error);
-      if (tab.active) startSession(tab.url, tabId, tab.windowId).catch(console.error);
+      if (tab.active)
+        startSession(tab.url, tabId, tab.windowId).catch(console.error);
     }
   });
   chrome.tabs?.onActivated?.addListener((activeInfo) => {
     chrome.tabs.get(activeInfo.tabId, (tab) => {
       if (chrome.runtime.lastError) return;
-      if (tab?.url) startSession(tab.url, activeInfo.tabId, tab.windowId).catch(console.error);
+      if (tab?.url)
+        startSession(tab.url, activeInfo.tabId, tab.windowId).catch(
+          console.error
+        );
     });
   });
   chrome.tabs?.onRemoved?.addListener((tabId) => {
-    if (currentSession?.tabId === tabId) endSession("tab-removed").catch(console.error);
+    if (currentSession?.tabId === tabId)
+      endSession("tab-removed").catch(console.error);
   });
   chrome.windows?.onFocusChanged?.addListener((winId) => {
     if (winId === chrome.windows.WINDOW_ID_NONE) {
@@ -440,8 +498,12 @@
     }
   });
   chrome.idle?.onStateChanged?.addListener((newState) => {
+    console.log(`[histo] idle state changed: ${newState}`);
     if (newState === "idle" || newState === "locked") {
+      console.log(`[histo] ending session due to ${newState}`);
       endSession(`idle-${newState}`).catch(console.error);
+    } else if (newState === "active") {
+      console.log("[histo] user is active again");
     }
   });
   chrome.runtime.onInstalled?.addListener(() => {
@@ -463,7 +525,7 @@
   chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
     if (msg?.action === "start-analysis") {
       console.log("[histo] start-analysis request");
-      aggregateAndStore().then(() => syncToBackend(true)).then(() => {
+      aggregateAndStore().then(() => syncToBackend()).then(() => {
         console.log("[histo] start-analysis complete (aggregated + synced)");
         sendResponse({ ok: true });
       }).catch((err) => {
@@ -500,6 +562,7 @@
   });
   console.log("[histo] background script loaded");
   chrome.alarms.create("aggregate", { periodInMinutes: 1 });
+  chrome.idle?.setDetectionInterval?.(30);
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === "aggregate") {
       console.log("[histo] alarm triggered, aggregating");
@@ -516,11 +579,19 @@
     testAggregate: () => aggregateAndStore(),
     testSync: () => syncToBackend(),
     // 🆕 Test sync function
-    checkStorage: () => storageGet(["siteStats", "processedSessionIds", "sessions", "lastSyncedAt"]).then((data) => {
+    checkStorage: () => storageGet([
+      "siteStats",
+      "processedSessionIds",
+      "sessions",
+      "lastSyncedAt"
+    ]).then((data) => {
       console.log("[debug] storage:", {
         sessions: data.sessions?.length || 0,
         processed: data.processedSessionIds?.length || 0,
-        minutes: Object.values(data.siteStats || {}).reduce((s, x) => s + (x.minutes || 0), 0),
+        minutes: Object.values(data.siteStats || {}).reduce(
+          (s, x) => s + (x.minutes || 0),
+          0
+        ),
         lastSynced: data.lastSyncedAt ? new Date(data.lastSyncedAt).toLocaleString() : "never"
       });
       return data;

@@ -2,6 +2,7 @@
 export {
   useUsageStore,
   UsageProvider,
+  fetchFromBackend,
   type UsageState,
   type SiteStat,
   type CategoryStat,
