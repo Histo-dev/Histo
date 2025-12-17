@@ -145,7 +145,8 @@
           return {
             url: urlString,
             title: session.domain || urlObj.hostname,
-            useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0
+            useTime: session.durationMs ? Math.round(session.durationMs / 1e3) : 0,
+            visitedAt: new Date(session.start).toISOString()
           };
         } catch (err) {
           console.warn(
@@ -524,7 +525,7 @@
   chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
     if (msg?.action === "start-analysis") {
       console.log("[histo] start-analysis request");
-      aggregateAndStore().then(() => syncToBackend(true)).then(() => {
+      aggregateAndStore().then(() => syncToBackend()).then(() => {
         console.log("[histo] start-analysis complete (aggregated + synced)");
         sendResponse({ ok: true });
       }).catch((err) => {

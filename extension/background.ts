@@ -274,6 +274,7 @@ const syncToBackend = async (forceFull = false) => {
             useTime: session.durationMs
               ? Math.round(session.durationMs / 1000)
               : 0,
+            visitedAt: new Date(session.start).toISOString(),
           };
         } catch (err) {
           console.warn(
@@ -287,6 +288,7 @@ const syncToBackend = async (forceFull = false) => {
       url: string;
       title: string;
       useTime: number;
+      visitedAt: string;
     }>;
 
     if (histories.length === 0) {
@@ -767,9 +769,9 @@ chrome.runtime.onInstalled?.addListener(() => {
 chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
   if (msg?.action === "start-analysis") {
     console.log("[histo] start-analysis request");
-    // Aggregate local data and sync to backend (force full sync)
+    // Aggregate local data and sync to backend (incremental sync)
     aggregateAndStore()
-      .then(() => syncToBackend(true)) // true = force full sync
+      .then(() => syncToBackend()) // 증분 동기화 (중복 방지)
       .then(() => {
         console.log("[histo] start-analysis complete (aggregated + synced)");
         sendResponse({ ok: true });

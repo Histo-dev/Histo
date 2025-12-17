@@ -38,7 +38,7 @@ export default function Overview() {
   const formatMinutes = (mins: number) => {
     if (mins >= 60) {
       const h = Math.floor(mins / 60);
-      const m = mins % 60;
+      const m = Math.round(mins) % 60;
       return m === 0 ? `${h}시간` : `${h}시간 ${m}분`;
     }
     return `${Math.max(0, Math.round(mins))}분`;
