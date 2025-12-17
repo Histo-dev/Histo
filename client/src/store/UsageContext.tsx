@@ -159,10 +159,16 @@ const fetchFromBackend = async (days?: number): Promise<UsageState | null> => {
     const siteStatsObj = localStorage?.siteStats || {};
     const siteStats = Object.values(siteStatsObj) as SiteStat[];
 
-    // 데이터 범위 계산 (로컬 스토리지에서 가져오기)
-    const dailyHistory = localStorage?.dailyHistory || {};
-    const dates = Object.keys(dailyHistory);
-    const dataRangeDays = dates.length;
+    // 데이터 범위 계산
+    // days 파라미터가 있으면 그것을 사용, 없으면 로컬 dailyHistory 기반
+    let dataRangeDays = 0;
+    if (days) {
+      dataRangeDays = days;
+    } else {
+      const dailyHistory = localStorage?.dailyHistory || {};
+      const dates = Object.keys(dailyHistory);
+      dataRangeDays = dates.length;
+    }
 
     const result = {
       totalTimeMinutes,
