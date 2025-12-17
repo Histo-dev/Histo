@@ -24,18 +24,19 @@ export default function Detail() {
   >([]);
   const [loadingAverage, setLoadingAverage] = useState(true);
 
-  // 백엔드에서 데이터 가져오기 (Detail 페이지 전용)
+  // 백엔드에서 데이터 가져오기 (period에 따라 변경)
   useEffect(() => {
     const loadBackendData = async () => {
       setLoading(true);
-      const data = await fetchFromBackend();
+      const days = period === "하루" ? 1 : period === "일주일" ? 7 : 30;
+      const data = await fetchFromBackend(days);
       if (data) {
         setBackendData(data);
       }
       setLoading(false);
     };
     loadBackendData();
-  }, []);
+  }, [period]);
 
   const categoryStats = backendData?.categoryStats || [];
   const totalTimeMinutes = backendData?.totalTimeMinutes || 0;
