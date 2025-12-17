@@ -227,3 +227,60 @@
   color: #999;
   margin: 0;
 }
+
+/* AI 조언 섹션 */
+.aiAdviceSection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.aiAdviceHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.aiIcon {
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+}
+
+.aiAdviceTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.aiAdviceContent {
+  background: linear-gradient(135deg, #f8f9ff 0%, #faf5ff 100%);
+  border: 1px solid #e9d5ff;
+  border-radius: 12px;
+  padding: 20px;
+  line-height: 1.8;
+}
+
+.aiAdviceLine {
+  font-size: 14px;
+  color: #374151;
+  margin: 0 0 12px 0;
+  line-height: 1.8;
+}
+
+.aiAdviceLine:last-child {
+  margin-bottom: 0;
+}
+
+/* AI 조언 강조 스타일 */
+.aiAdviceLine strong {
+  color: #6366f1;
+  font-weight: 600;
+}
