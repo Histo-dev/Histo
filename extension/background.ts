@@ -738,8 +738,12 @@ chrome.windows?.onFocusChanged?.addListener((winId) => {
 });
 
 chrome.idle?.onStateChanged?.addListener((newState) => {
+  console.log(`[histo] idle state changed: ${newState}`);
   if (newState === "idle" || newState === "locked") {
+    console.log(`[histo] ending session due to ${newState}`);
     endSession(`idle-${newState}`).catch(console.error);
+  } else if (newState === "active") {
+    console.log("[histo] user is active again");
   }
 });
 
@@ -816,6 +820,10 @@ chrome.runtime?.onMessage?.addListener((msg, sender, sendResponse) => {
 // Initialize: set up periodic aggregation (no auto-sync)
 console.log("[histo] background script loaded");
 chrome.alarms.create("aggregate", { periodInMinutes: 1 });
+
+// Set idle detection interval to 30 seconds
+// This will detect when user is inactive (screen locked, laptop closed, etc.)
+chrome.idle?.setDetectionInterval?.(30);
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "aggregate") {
