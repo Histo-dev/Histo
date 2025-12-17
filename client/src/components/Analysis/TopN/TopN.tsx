@@ -49,61 +49,67 @@ export default function TopN() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* Most Time Spent */}
-      {topByTime.length > 0 && (
-        <div className={styles.section}>
-          <div className={styles.title}>
-            {trophyIcon && <img src={trophyIcon} alt="trophy" />}
-            <h3>가장 오래 체류한 사이트</h3>
+    <div className={styles.wrapper}>
+      <div className={styles.header}>
+        <h2>🏆 TOP 3</h2>
+      </div>
+      <div className={styles.container}>
+        {/* Most Time Spent */}
+        {topByTime.length > 0 && (
+          <div className={styles.section}>
+            <div className={styles.title}>
+              {trophyIcon && <img src={trophyIcon} alt="trophy" />}
+              <h3>가장 오래 체류한 사이트</h3>
+            </div>
+            <div className={styles.list}>
+              {topByTime.map((t, idx) => (
+                <div key={t.domain} className={styles.rankItem}>
+                  <div className={styles.rank}>{idx + 1}</div>
+                  <Domain
+                    site={t as ISite}
+                    formatedTime={formatTime(t.minutes)}
+                    percentage={(
+                      (t.minutes / (totalTimeMinutes || t.minutes || 1)) *
+                      100
+                    ).toFixed(1)}
+                    onOpen={openDomain}
+                    showDomain={true}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-          <div className={styles.list}>
-            {topByTime.map((t, idx) => (
-              <div key={t.domain} className={styles.rankItem}>
-                <div className={styles.rank}>{idx + 1}</div>
-                <Domain
-                  site={t as ISite}
-                  formatedTime={formatTime(t.minutes)}
-                  percentage={(
-                    (t.minutes / (totalTimeMinutes || t.minutes || 1)) *
-                    100
-                  ).toFixed(1)}
-                  onOpen={openDomain}
-                  showDomain={true}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Most Visited */}
-      {topByVisits.length > 0 && (
-        <div className={styles.section}>
-          <div className={styles.title}>
-            {trophyIcon && <img src={trophyIcon} alt="trophy" />}
-            <h3>가장 많이 방문한 사이트</h3>
+        {/* Most Visited */}
+        {topByVisits.length > 0 && (
+          <div className={styles.section}>
+            <div className={styles.title}>
+              {trophyIcon && <img src={trophyIcon} alt="trophy" />}
+              <h3>가장 많이 방문한 사이트</h3>
+            </div>
+            <div className={styles.list}>
+              {topByVisits.map((t, idx) => (
+                <div key={t.domain} className={styles.rankItem}>
+                  <div className={styles.rank}>{idx + 1}</div>
+                  <Domain
+                    site={t as ISite}
+                    formatedTime={`${t.visits}회`}
+                    percentage={(
+                      (t.visits /
+                        (siteStats.reduce((sum, s) => sum + s.visits, 0) ||
+                          1)) *
+                      100
+                    ).toFixed(1)}
+                    onOpen={openDomain}
+                    showDomain={true}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-          <div className={styles.list}>
-            {topByVisits.map((t, idx) => (
-              <div key={t.domain} className={styles.rankItem}>
-                <div className={styles.rank}>{idx + 1}</div>
-                <Domain
-                  site={t as ISite}
-                  formatedTime={`${t.visits}회`}
-                  percentage={(
-                    (t.visits /
-                      (siteStats.reduce((sum, s) => sum + s.visits, 0) || 1)) *
-                    100
-                  ).toFixed(1)}
-                  onOpen={openDomain}
-                  showDomain={true}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
