@@ -32,16 +32,21 @@ export class ClassificationService implements OnModuleInit {
 
       const categories = await this.categoryService.findAll();
 
-      // 카테고리별 대표 문장 정의
+      // Category representative sentences (enhanced keywords and subcategorization)
       const categoryTexts: Record<string, string> = {
-        업무: '업무 이메일 문서 작업 회의 업무용 사이트',
-        학습: '학습 강의 튜토리얼 교육 공부 온라인 강좌',
-        개발: '개발 프로그래밍 코딩 GitHub 개발자 문서',
-        엔터테인먼트: '영상 동영상 영화 게임 음악 엔터테인먼트',
-        소셜미디어: '소셜미디어 SNS 커뮤니티 블로그 포럼',
-        쇼핑: '쇼핑 구매 전자상거래 온라인쇼핑몰',
-        뉴스: '뉴스 기사 언론 미디어 정보',
-        기타: '기타 일반 웹사이트',
+        업무: 'work business email documents tasks meetings presentations spreadsheets collaboration project management office productivity tools enterprise internal systems corporate',
+        학습: 'learning education course tutorial study online class lecture notes educational materials academic papers research school university educational platform lessons academy',
+        개발: 'development programming coding GitHub GitLab developer documentation API reference technical blog Stack Overflow code review development tools IDE library framework source code',
+        엔터테인먼트: 'video movies drama entertainment games music streaming YouTube Netflix entertainment content recreation hobby webtoon comics animation',
+        소셜미디어: 'social media SNS community blog forum social network Instagram Twitter Facebook bulletin board comments communication followers',
+        쇼핑: 'shopping purchase e-commerce online shopping mall products goods cart checkout delivery marketplace store discount sale price comparison',
+        뉴스: 'news articles press media information breaking news headlines current affairs politics economy society newsletter newspaper report coverage',
+        금융: 'finance banking securities investment stocks cryptocurrency exchange funds loans insurance asset management economy banking card payment',
+        디자인: 'design UI UX graphic illustration Photoshop Figma Sketch Dribbble Behance portfolio art creation design tools colors fonts typography',
+        건강: 'health medical hospital pharmacy exercise fitness diet nutrition yoga wellness health information disease symptoms treatment medical checkup medicine',
+        여행: 'travel tourism hotel accommodation flight booking destinations restaurants tourist attractions tours resort vacation overseas travel domestic travel travel reviews guide',
+        레퍼런스: 'wiki encyclopedia dictionary glossary manual guide documentation reference knowledge information search archive resources',
+        기타: 'miscellaneous general website other uncategorized unclassified',
       };
 
       for (const category of categories) {
