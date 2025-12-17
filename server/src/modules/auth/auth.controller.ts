@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Request } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { UserService } from '../user/user.service';
@@ -63,6 +63,48 @@ export class AuthController {
         userId: user.id,
         email: user.email,
         name: user.name,
+      },
+    };
+  }
+
+  @Get('verify')
+  @ApiOperation({
+    summary: 'JWT 토큰 검증',
+    description: '현재 JWT 토큰의 유효성을 확인하고 사용자 정보를 반환합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '토큰이 유효함',
+    schema: {
+      type: 'object',
+      properties: {
+        valid: { type: 'boolean', example: true },
+        user: {
+          type: 'object',
+          properties: {
+            userId: { type: 'string' },
+            email: { type: 'string' },
+            name: { type: 'string' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: '유효하지 않거나 만료된 토큰',
+  })
+  async verifyToken(
+    @Request() req: { user: { id: string; email: string; name: string } },
+  ) {
+    // JwtAuthGuard가 이미 토큰을 검증했으므로
+    // req.user에 사용자 정보가 담겨있음
+    return {
+      valid: true,
+      user: {
+        userId: req.user.id,
+        email: req.user.email,
+        name: req.user.name,
       },
     };
   }
