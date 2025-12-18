@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, lazy, Suspense } from "react";
 import html2canvas from "html2canvas";
 import styles from "./Analysis.module.css";
 import Header from "./AnalysisMeta/Header";
@@ -9,6 +9,9 @@ import Overview from "./Overview/Overview";
 import TopN from "./TopN/TopN";
 import Detail from "./Detail/Detail";
 import Advice from "./Advice/Advice";
+const DomainAlertSettings = lazy(
+  () => import("../Settings/DomainAlertSettings")
+);
 
 type Props = {
   onBack?: () => void;
@@ -181,6 +184,13 @@ export default function Analysis({ onBack }: Props) {
             >
               📷 저장
             </button>
+            <button
+              className={styles.optionBtn}
+              onClick={() => navigate("/analysis/alert-settings")}
+              title="알림/옵션 설정"
+            >
+              ⚙️ 옵션
+            </button>
           </div>
         </div>
         <StatCards />
@@ -189,11 +199,14 @@ export default function Analysis({ onBack }: Props) {
           onSelect={(t) => changeTab(t)}
         />
 
-        <Routes>
-          <Route path="overview" element={<Overview />} />
-          <Route path="topN" element={<TopN />} />
-          <Route path="advice" element={<Advice />} />
-        </Routes>
+        <Suspense fallback={<div>로딩 중...</div>}>
+          <Routes>
+            <Route path="overview" element={<Overview />} />
+            <Route path="topN" element={<TopN />} />
+            <Route path="advice" element={<Advice />} />
+            <Route path="alert-settings" element={<DomainAlertSettings />} />
+          </Routes>
+        </Suspense>
       </div>
     </div>
   );

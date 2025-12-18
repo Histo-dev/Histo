@@ -27,7 +27,7 @@
 
 .copyBtn,
 .downloadBtn {
-  padding: 0.5rem 1rem;
+  padding: 8px 8px;
   border: none;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -36,6 +36,22 @@
   transition: all 0.2s ease;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+}
+
+.optionBtn {
+  padding: 8px 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #e5e7eb;
+  color: #312c85;
+  margin-left: 0.5rem;
+  transition: background 0.2s;
+}
+.optionBtn:hover {
+  background: #d1d5db;
 }
 
 .copyBtn:hover,
